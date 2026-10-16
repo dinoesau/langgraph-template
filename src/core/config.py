@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     LONG_TERM_MEMORY_EMBEDDER_MODEL: str = ""
     LONG_TERM_MEMORY_MODEL: str = ""
     LONG_TERM_MEMORY_TOP_K: int = Field(default=3, ge=1, le=20)
+    LANGFUSE_TRACING_ENABLED: bool = True
+    TRACE_LOG_PATH: str = ""
+    DEBUG: bool = False
+    SLOW_REQUEST_THRESHOLD_MS: float = Field(default=1000.0, ge=0.0)
+    PROFILE_DIR: str = Field(default="profiles", min_length=1)
 
 
 @lru_cache

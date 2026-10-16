@@ -97,6 +97,26 @@ See `docs/memory.md:1` for the full memory guide.
 | `LONG_TERM_MEMORY_MODEL` | empty | Existe | Reserved extraction model name |
 | `LONG_TERM_MEMORY_TOP_K` | `3` | Existe | Memories injected as context per turn, 1 to 20 |
 
+## Observability
+
+These variables are live in `src/core/config.py:1`.
+They control tracing, structured log context needs no flag, metrics need no flag, and debug-only profiling.
+See `docs/observability.md:1` for the full observability guide.
+
+| Variable | Default | Status | Description |
+| --- | --- | --- | --- |
+| `LANGFUSE_TRACING_ENABLED` | `true` | Existe | Traces every LLM call with inputs, outputs, usage, latency, and identity; `false` runs fully offline |
+| `TRACE_LOG_PATH` | empty | Existe | Appends one JSON line per trace for eval input; empty keeps traces in memory only |
+| `DEBUG` | `false` | Existe | Enables the debug-only slow-request profiler; never enable in production |
+| `SLOW_REQUEST_THRESHOLD_MS` | `1000.0` | Existe | Latency in ms that triggers a slow profile; `0` profiles every request in debug mode |
+| `PROFILE_DIR` | `profiles` | Existe | Directory for `<request_id>.json` slow profiles, joined to logs by `X-Request-ID` |
+
+`LANGFUSE_TRACING_ENABLED` maps to `.env.example:5`.
+`TRACE_LOG_PATH` maps to `.env.example:6`.
+`DEBUG` maps to `.env.example:7`.
+`SLOW_REQUEST_THRESHOLD_MS` maps to `.env.example:8`.
+`PROFILE_DIR` maps to `.env.example:9`.
+
 Chat identity always comes from the session token, so recall is scoped to the token owner.
 See `docs/authentication.md:1` for the token scopes.
 
@@ -109,7 +129,6 @@ Do not rely on them until each module ships.
 | --- | --- | --- | --- |
 | `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
-| `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
 
 ## Validation
 

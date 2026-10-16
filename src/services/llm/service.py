@@ -9,6 +9,7 @@ RuntimeError. Tools rebind and structured output rechains on every switch.
 
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
@@ -16,6 +17,14 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 
 from src.core.config import get_settings
+from src.core.metrics import observe_llm
+from src.core.middleware import get_request_id, get_thread_id
+from src.core.tracing import (
+    extract_output_text,
+    extract_usage,
+    messages_to_inputs,
+    record_trace,
+)
 from src.services.llm.registry import default_factories, ordered_names
 
 logger = logging.getLogger(__name__)
@@ -96,13 +105,25 @@ class LLMService:
         *,
         model_name: str | None = None,
         response_format: Any | None = None,
+        request_id: str | None = None,
+        user_id: str | None = None,
+        thread_id: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Run one model call with retries and fallback under a total budget."""
+        identity = (
+            request_id if request_id is not None else get_request_id(),
+            user_id if user_id is not None else "",
+            thread_id if thread_id is not None else get_thread_id(),
+        )
         try:
             return await asyncio.wait_for(
                 self._run(
-                    messages, model_name=model_name, response_format=response_format, kwargs=kwargs
+                    messages,
+                    model_name=model_name,
+                    response_format=response_format,
+                    kwargs=kwargs,
+                    identity=identity,
                 ),
                 timeout=self._total_timeout,
             )
@@ -118,6 +139,7 @@ class LLMService:
         model_name: str | None,
         response_format: Any | None,
         kwargs: dict[str, Any],
+        identity: tuple[str, str, str] = ("", "", ""),
     ) -> Any:
         names = ordered_names(model_name, list(self._factories))
         errors: list[str] = []
@@ -126,12 +148,14 @@ class LLMService:
             try:
                 model = self._factories[name]()
             except (RuntimeError, ImportError) as exc:
-                logger.warning("skipping unbuildable model %s: %s", name, exc)
+                logger.warning("llm_model_skipped", extra={"model": name, "error": str(exc)})
                 errors.append(f"{name}: {exc}")
                 continue
             attempted = True
             try:
-                return await self._call_model(name, model, messages, response_format, kwargs)
+                return await self._call_model(
+                    name, model, messages, response_format, kwargs, identity=identity
+                )
             except _ModelExhausted as exc:
                 errors.append(f"{name}: {exc.last_error}")
                 continue
@@ -146,22 +170,54 @@ class LLMService:
         messages: Sequence[BaseMessage],
         response_format: Any | None,
         kwargs: dict[str, Any],
+        *,
+        identity: tuple[str, str, str] = ("", "", ""),
     ) -> Any:
         bound: Any = model
         if response_format is not None:
             bound = model.with_structured_output(response_format)
         if self._tools and hasattr(bound, "bind_tools"):
             bound = bound.bind_tools(self._tools)
+        request_id, user_id, thread_id = identity
+        inputs = messages_to_inputs(messages)
         last_error: BaseException | None = None
         for attempt in range(self._max_retries):
+            start = time.perf_counter()
             try:
-                return await bound.ainvoke(list(messages), **kwargs)
+                result = await bound.ainvoke(list(messages), **kwargs)
             except Exception as exc:
+                latency_ms = (time.perf_counter() - start) * 1000.0
+                observe_llm(name, latency_ms / 1000.0)
+                record_trace(
+                    model=name,
+                    inputs=inputs,
+                    output="",
+                    usage={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+                    latency_ms=latency_ms,
+                    request_id=request_id,
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    error=str(exc),
+                )
                 if not is_retryable(exc):
                     raise
                 last_error = exc
                 if attempt < self._max_retries - 1:
                     await self._sleep(backoff_delay(attempt))
+                continue
+            latency_ms = (time.perf_counter() - start) * 1000.0
+            observe_llm(name, latency_ms / 1000.0)
+            record_trace(
+                model=name,
+                inputs=inputs,
+                output=extract_output_text(result),
+                usage=extract_usage(result),
+                latency_ms=latency_ms,
+                request_id=request_id,
+                thread_id=thread_id,
+                user_id=user_id,
+            )
+            return result
         raise _ModelExhausted(name, last_error)
 
 

@@ -5,10 +5,11 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.v1 import router as v1_router
+from src.core.metrics import render_text, set_db_connections
 from src.core.middleware import RequestContextMiddleware
 from src.services.database import cache_status, database_lifespan, store_status
 
@@ -33,7 +34,7 @@ def _error_response(status_code: int, code: str, message: str, request_id: str) 
 
 
 def create_app(lifespan: Lifespan = database_lifespan) -> FastAPI:
-    """Build the API with health, metrics stub, chat routes, and store lifespan."""
+    """Build the API with health, Prometheus metrics, chat routes, and store lifespan."""
     app = FastAPI(title="langgraph-template", lifespan=lifespan)
     app.add_middleware(RequestContextMiddleware)
     app.include_router(v1_router)
@@ -50,8 +51,14 @@ def create_app(lifespan: Lifespan = database_lifespan) -> FastAPI:
         }
 
     @app.get("/metrics")
-    def metrics() -> dict[str, str]:
-        return {"status": "stub"}
+    def metrics(request: Request) -> Response:
+        """Expose request, model, and store signals in Prometheus text format."""
+        checkpointer = getattr(request.app.state, "checkpointer", None)
+        set_db_connections(1 if checkpointer is not None else 0)
+        return Response(
+            content=render_text(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
