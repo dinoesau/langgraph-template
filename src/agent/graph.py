@@ -4,13 +4,14 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from src.agent.nodes import chat, tool_call
-from src.agent.routes import route_after_chat
+from src.agent.nodes import chat, generator, grader, tool_call
+from src.agent.routes import route_after_chat, route_after_grader
 from src.agent.state import GraphState
 
 # S3 runs the two-node chat <-> tool_call ReAct loop.
 # The loop ends when the LLM reply carries no tool calls.
-# Persistence arrives only through the factory below:
+# S5d runs the generator -> grader evaluator loop with a guard below 3.
+# Persistence arrives only through the factories below:
 # the loop module never imports storage, it only accepts an injected checkpointer.
 
 
@@ -33,4 +34,24 @@ def make_the_agent(
     return _build().compile(checkpointer=checkpointer)
 
 
+def _build_evaluator() -> StateGraph[GraphState, Any, Any, Any]:
+    builder = StateGraph(GraphState)
+    builder.add_node("generator", generator)
+    builder.add_node("grader", grader)
+    builder.add_edge(START, "generator")
+    builder.add_edge("generator", "grader")
+    builder.add_conditional_edges(
+        "grader", route_after_grader, {"generator": "generator", "__end__": END}
+    )
+    return builder
+
+
+def make_evaluator_agent(
+    checkpointer: BaseCheckpointSaver[str] | None = None,
+) -> CompiledStateGraph[GraphState, Any, Any, Any]:
+    """Compile the generator/grader loop with the same checkpointer contract."""
+    return _build_evaluator().compile(checkpointer=checkpointer)
+
+
 graph = make_the_agent()
+evaluator_graph = make_evaluator_agent()
