@@ -87,7 +87,8 @@ def run_env() -> None:
     """Entry point used when Alembic executes this file as its environment."""
     config = context.config
     if config.config_file_name is not None:
-        fileConfig(config.config_file_name)
+        # Never silence app loggers: migrations share the process with tests.
+        fileConfig(config.config_file_name, disable_existing_loggers=False)
     url = resolve_url(config.get_main_option("sqlalchemy.url") or "")
     if context.is_offline_mode():
         run_migrations_offline(url)

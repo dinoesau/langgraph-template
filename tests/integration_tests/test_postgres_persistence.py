@@ -16,7 +16,7 @@ import psycopg
 import pytest
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import create_engine, inspect
@@ -25,6 +25,24 @@ from alembic import command
 from src.agent.graph import make_the_agent
 from src.api.app import create_app
 from src.core.config import get_settings
+from src.services.llm.service import llm_service
+
+
+@pytest.fixture(autouse=True)
+def _fake_llm_echo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep persistence tests hermetic: the loop answers through a fake echo."""
+
+    async def _echo(messages: object, **kwargs: object) -> AIMessage:
+        text = ""
+        assert isinstance(messages, list)
+        for message in reversed(messages):
+            if isinstance(message, HumanMessage):
+                text = message.content if isinstance(message.content, str) else ""
+                break
+        return AIMessage(content=text)
+
+    monkeypatch.setattr(llm_service, "call", _echo)
+
 
 IMAGE = "postgres:15-alpine"
 TEST_DB = "test_s2a"

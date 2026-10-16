@@ -11,7 +11,7 @@ La logica de llamada vive en `ws/src/services/llm/service.py:1`.
 El layout de servicios esta en `ws/docs/structure.md:51`.
 El modelo por contexto se declara en `ws/src/agent/configuration.py:1`.
 Las claves de proveedor estan en `ws/.env.example:1`.
-El codigo del agente llama a `llm_service.call(messages)` y el servicio hace el resto.
+El codigo del agente llama a `llm_service.call(messages)` y el servicio se encarga del resto.
 `messages` viene de `GraphState` en `ws/src/agent/state.py:1` que usa `MessagesState` con lista pequena `docs`.
 
 ## Registry planeado

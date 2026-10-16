@@ -1,15 +1,15 @@
 # Docker
 
-Local postgres runs in compose today.
+Local postgres with pgvector plus Valkey run in compose.
 The full stack is planned.
 This guide covers current use plus the target stack.
 
 ## Status
 
-`ws/docker-compose.yml:1` defines one service today.
-That service is postgres on port 5432.
-It has no pgvector extension yet.
-It has no cache or monitoring services yet.
+`ws/docker-compose.yml:1` defines two services today.
+Postgres with pgvector runs on port 5432.
+Valkey runs on port 6379 as the shared memory-search cache.
+Application code keeps the in-memory fallback when Valkey is unreachable.
 See `ws/docs/structure.md:69` for the compose role.
 See `ws/pyproject.toml:1` for the uv-only packaging setup.
 See `ws/langgraph.json:1` for the graph and env pointer.
@@ -36,9 +36,9 @@ graph TB
 
 ## Services
 
-Postgres stores app data and checkpoints today.
-It will later store vectors too.
-Valkey is planned as a shared cache for memory search.
+Postgres stores app data, checkpoints, and vectors.
+The image is `pgvector/pgvector:0.8.0-pg15` and the lifespan enables the `vector` extension.
+Valkey is the shared cache for memory search with an in-memory fallback in code.
 Prometheus is planned to scrape `GET /metrics`.
 Grafana is planned to render latency and error dashboards.
 A container metrics exporter is planned for system views.
@@ -53,7 +53,7 @@ Planned ports:
 | prometheus | 9090 | Metrics store |
 | grafana | 3000 | Dashboards |
 
-Only the postgres port is live today.
+Only monitoring services are still planned.
 
 ## Commands
 
@@ -133,17 +133,14 @@ make migrate
 
 ## What exists today
 
-`ws/docker-compose.yml:1` starts postgres with fixed credentials.
+`ws/docker-compose.yml:1` starts pgvector postgres with fixed credentials plus Valkey.
 `ws/Makefile:8` installs with `uv sync`.
 `ws/Makefile:11` runs the dev server.
 No app image exists yet.
-No Valkey service exists yet.
 No monitoring services exist yet.
 
 ## Next steps
 
-Enable pgvector on the postgres image.
-Add Valkey with fallback kept in code.
 Add app service with uv-based image build.
 Add Prometheus plus Grafana for local monitoring.
 Add per-stage env files and stack shortcuts.
