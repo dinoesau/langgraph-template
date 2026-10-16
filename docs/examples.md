@@ -28,10 +28,17 @@ Done when an off-policy question gets "I don't know" instead of a hallucinated a
 
 ## 3. Router / triage
 
+Status: implemented.
 Entry `intention_route` in `ws/src/agent/routes.py:1` sends each request to RAG assistant, booking, or chat.
-Rule: refund/status questions go to the RAG assistant, date/time requests go to booking, everything else goes to chat.
-The booking node is a subgraph with its own ReAct loop from example 1.
-Done when all three trigger queries route to the right subgraph.
+Rule first: refund/status/policy goes to the RAG assistant, date/time/booking words or date/time patterns go to booking, the rest falls to model assist.
+Model assist calls `llm_service.call` in `ws/src/services/llm/service.py:1` with `response_format=IntentDecision` for ambiguous requests only.
+The verdict shape is `IntentDecision` in `ws/src/agent/routes.py:1` with `intent` of rag, booking, or chat, defaulting to chat on failure.
+The booking node is a subgraph reusing the ReAct loop from example 1 sharing `GraphState` in `ws/src/agent/state.py:1`.
+The subgraph compiles without a checkpointer so it inherits the parent one with no extra persistence setup.
+Wiring uses `add_conditional_edges` from `START` via `intention_route` in `ws/src/agent/graph.py:1` with retrieve, booking, and chat targets.
+The RAG branch reuses `retrieve` plus `generate` from `ws/src/agent/rag.py:1` and booking tools stay in `ws/src/agent/tools/booking.py:1`.
+The router compiles via `make_router_agent(checkpointer)` sharing `GraphState`.
+Done when all three trigger families route to the right branch end to end.
 
 ## 4. Parallel workers
 
