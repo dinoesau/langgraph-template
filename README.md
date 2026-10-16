@@ -5,6 +5,7 @@ It keeps the deploy contract small so you can grow the codebase step by step.
 It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
 S0 ships an echo graph and later milestones add tools and services.
+S1 adds the API skeleton with typed config and request logging.
 
 ## What's included
 
@@ -14,8 +15,11 @@ S0 ships an echo graph and later milestones add tools and services.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
 - S0 echo loop in `src/agent/graph.py:1` runs START to chat to END with no tools yet.
-- Planned services for LLM fallback, memory, database, auth, and observability are not implemented yet.
+- S1 API skeleton in `src/api/app.py:1` serves health with dependencies stub, chat, stream with `thread_id`, and metrics stub.
+- S1 typed settings in `src/core/config.py:1` load env with fail-fast validation.
+- Planned services for LLM fallback, memory, database, and auth are not implemented yet.
 - Tests in `tests/unit_tests/` cover the echo node and graph without model calls.
+- Tests in `tests/unit_tests/test_api.py:1` cover the S1 routes without network calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
 ## Quickstart
@@ -62,6 +66,8 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 ```text
 langgraph-template/
 ├── src/agent/        # S0 echo graph, state, nodes
+├── src/api/          # S1 HTTP skeleton, chat routes
+├── src/core/         # S1 typed settings and request middleware
 ├── tests/            # unit echo tests plus integration placeholders
 ├── docs/             # 13 guides: structure, examples, testing, services
 ├── langgraph.json    # deploy contract

@@ -2,7 +2,7 @@
 
 All settings come from environment variables.
 Local dev reads `.env` through the pointer in `langgraph.json:1`.
-Typed settings in `src/core/config.py:1` are still planned.
+Typed settings live in `src/core/config.py:1`.
 
 ## Setup
 
@@ -49,15 +49,30 @@ Start the service when you need persistence.
 docker compose up -d postgres
 ```
 
-## Planned settings
+## App settings
 
-These names are reserved for `src/core/config.py:1` and have no effect today.
-Do not rely on them until the settings module ships.
+These variables are live in `src/core/config.py:1`.
+They fail fast with a validation error on bad values.
 
 | Variable | Default | Status | Description |
 | --- | --- | --- | --- |
-| `APP_ENV` | planeado | planeado | Selects development, staging, or production behavior |
-| `LOG_LEVEL` | planeado | planeado | Controls console verbosity for local runs |
+| `APP_ENV` | `development` | Existe | Selects development, staging, or production behavior |
+| `LOG_LEVEL` | `INFO` | Existe | Controls console verbosity for local runs |
+| `HOST` | `127.0.0.1` | Existe | Bind host for the API server |
+| `PORT` | `8000` | Existe | Bind port for the API server, 1 to 65535 |
+
+`APP_ENV` maps to `.env.example:6`.
+`LOG_LEVEL` maps to `.env.example:7`.
+`HOST` maps to `.env.example:8`.
+`PORT` maps to `.env.example:9`.
+
+## Planned settings
+
+These names are reserved for `src/core/config.py:1` and have no effect today.
+Do not rely on them until each module ships.
+
+| Variable | Default | Status | Description |
+| --- | --- | --- | --- |
 | `DEFAULT_LLM_MODEL` | planeado | planeado | Starting model for the chat node |
 | `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |

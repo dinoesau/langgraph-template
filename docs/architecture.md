@@ -2,6 +2,7 @@
 
 This doc shows how the starter fits together today and where it grows next.
 S0 ships the echo graph in `src/agent/graph.py:1` with state and a pure chat node.
+S1 adds the HTTP skeleton in `src/api/app.py:1` with typed settings.
 Every other block below is still marked as planned.
 The layout follows the spec in `docs/structure.md:1`.
 
@@ -37,8 +38,8 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
-| HTTP API | `src/api/v1/:1` | Planeado | Translates HTTP into graph invoke or stream calls |
-| Settings | `src/core/config.py:1` | Planeado | Loads typed settings from env vars |
+| HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls |
+| Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars |
 | Services | `src/services/:1` | Planeado | Owns LLM fallback, memory, and database access |
 | Checkpointer | AsyncPostgresSaver | Planeado | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
@@ -56,7 +57,15 @@ Each step below runs in order for one user message.
 5. No checkpointer persists state yet, so each invoke is stateless.
 6. The final message returns to Studio.
 
-Auth, rate limits, and background memory writes are planned with `src/api/` and `src/services/`.
+The S1 HTTP lifecycle runs through `src/api/app.py:1`.
+
+1. Client posts to `/api/v1/chat` or `/api/v1/chat/stream`.
+2. `RequestContextMiddleware` assigns or reuses `X-Request-ID` and binds `thread_id` into the JSON access log to stdout.
+3. The route invokes the echo graph with `graph.invoke` or `graph.stream`.
+4. The reply returns with `thread_id` pass-through plus `X-Request-ID`; stream SSE data events carry `thread_id` and end with `[DONE]`.
+5. `GET /health` returns status ok plus the dependencies stub (`loop: ok`, `store/cache: not_configured`); real checks land with S2/DB. `GET /metrics` returns the stub.
+
+Auth, rate limits, and background memory writes are planned with `src/services/`.
 
 ## Agent graph
 
