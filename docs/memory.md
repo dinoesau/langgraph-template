@@ -7,9 +7,11 @@ This guide describes the target design for this starter.
 ## Status
 
 Short term state lives in the graph checkpointer.
+`GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
+Graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `ws/docs/structure.md:132`.
 See `ws/src/agent/graph.py:1` for the planned wiring point.
-See `ws/docs/structure.md:52` for the `src/services/memory.py` role.
-See `ws/docs/structure.md:166` for the `src/core/cache.py` role.
+See `ws/docs/structure.md:172` for the `ws/src/services/memory.py:1` role.
+See `ws/docs/structure.md:165` for the `ws/src/core/cache.py:1` role.
 Semantic memory and cache are both marked as planned.
 Today only `ws/src/agent/__init__.py:1` exists in code.
 Today `ws/docker-compose.yml:1` only starts postgres.
@@ -90,7 +92,9 @@ The service will open its vector connection at startup.
 It will check the collection schema before serving traffic.
 This will avoid paying cold init cost on the first request.
 The call will live in the app lifespan when FastAPI exists.
-See `ws/docs/structure.md:53` for the database lifespan role.
+See `ws/docs/structure.md:173` for the database lifespan role.
+Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `ws/docs/structure.md:184`.
+Tools live in `ws/src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
 
 ## Per-user isolation
 
@@ -109,8 +113,8 @@ It has no Valkey service yet.
 
 ## Next steps
 
-Add `src/services/memory.py` with search and add functions.
-Add `src/core/cache.py` with Valkey plus in-memory fallback.
+Add `ws/src/services/memory.py:1` with search and add functions.
+Add `ws/src/core/cache.py:1` with Valkey plus in-memory fallback.
 Extend `ws/docker-compose.yml:1` with pgvector and Valkey.
 Add env vars to `ws/.env.example:1` for collection and TTL.
 Wire memory search into the chat node in `ws/src/agent/graph.py:1`.

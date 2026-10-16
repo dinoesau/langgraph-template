@@ -34,13 +34,13 @@ Evals will run on demand with uv.
 They will never run as part of unit tests by default.
 Use the planned runner once `ws/evals/eval_runner.py:1` exists.
 
-Planned commands:
+Planned commands once `ws/evals/eval_runner.py:1` exists:
 
 ```bash
-uv sync
+make install
+make test
+make integration_tests
 uv run python evals/eval_runner.py
-uv run pytest tests/unit_tests
-uv run pytest tests/integration_tests
 ```
 
 Unit tests will cover nodes and routes with fake models.

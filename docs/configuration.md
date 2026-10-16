@@ -27,7 +27,7 @@ Set at least one provider key before starting the dev server.
 | `GOOGLE_API_KEY` | empty | one of the three | Key for Google models |
 | `LANGSMITH_API_KEY` | empty | no | Enables LangSmith tracing when set |
 
-Each key maps to line 1 to 4 of `.env.example:1`.
+Each key maps to `.env.example:1` through `.env.example:4` in order.
 
 ## Database
 
@@ -42,7 +42,7 @@ The graph runs without persistence until the checkpointer lands.
 | `POSTGRES_DB` | `postgres` | no | Database name for the compose service |
 
 `POSTGRES_URI` maps to `.env.example:5`.
-The compose values map to `docker-compose.yml:6` through `docker-compose.yml:9`.
+The compose values map to `docker-compose.yml:7` through `docker-compose.yml:9`.
 Start the service when you need persistence.
 
 ```bash

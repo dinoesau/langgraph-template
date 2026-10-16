@@ -61,7 +61,7 @@ langgraph-base/
 │   └── integration_tests/   # real models, run on purpose
 ├── notebooks/
 │   └── 01-graph-intro.ipynb # experiments only, never imported by src
-├── docs/                    # per-service guides, optional
+├── docs/                    # guides plus structure.md spec, optional
 ├── grafana/                 # dashboards, optional
 ├── prometheus/              # metrics config, optional
 ├── static/
@@ -73,7 +73,6 @@ langgraph-base/
 ├── .env.example
 ├── .env
 ├── Makefile                 # uv shortcuts: install, dev, test, lint, format
-├── docs/                    # guides plus structure.md and examples.md specs
 └── README.md                # quickstart only, links here
 ```
 
@@ -100,7 +99,7 @@ Run `uv run pytest` to run tests.
 ### `langgraph.json`
 
 This file maps graph name to module variable for CLI and Cloud.
-It points `env` to `./.env` for local dev.
+It points `env` to `.env` for local dev.
 Production sets env vars in the deployment environment instead.
 Example:
 
@@ -110,7 +109,7 @@ Example:
   "graphs": {
     "agent": "./src/agent/graph.py:graph"
   },
-  "env": "./.env"
+  "env": ".env"
 }
 ```
 

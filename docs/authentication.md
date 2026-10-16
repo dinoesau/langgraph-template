@@ -21,7 +21,7 @@ sequenceDiagram
     participant A as API
 
     C->>A: POST /api/v1/auth/register<br/>{email, password, username?}
-    A-->>C: {user_id, email, username, token}
+    A-->>C: {user_id, email, username, access_token, expires_at}
 
     C->>A: POST /api/v1/auth/login<br/>form: email + password
     A-->>C: {access_token, expires_at}
@@ -43,6 +43,7 @@ Ambos seran JWT firmados con HS256 y expiracion configurable.
 ### `POST /api/v1/auth/register`
 
 Crea una cuenta nueva con email, password y username opcional.
+Devuelve `user_id`, `email`, `username`, `access_token` y `expires_at` como el login.
 El password requerira 8 o mas caracteres con mayuscula, minuscula, numero y simbolo.
 El username se pasara al system prompt para personalizar las respuestas.
 

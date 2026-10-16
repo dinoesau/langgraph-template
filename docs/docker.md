@@ -70,6 +70,7 @@ docker compose down
 ```
 
 Planned shortcuts will wrap env files per stage.
+Those shortcuts do not exist yet.
 They will follow the `ws/Makefile:8` pattern.
 Example target shape will be `docker-up` and `stack-up`.
 Full stack will add Prometheus plus Grafana in one command.

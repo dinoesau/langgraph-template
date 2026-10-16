@@ -11,7 +11,7 @@ El acceso a datos vivira en `ws/src/services/database.py:1`.
 Las migraciones viviran en `ws/alembic/:1`.
 La conexion local esta en `ws/docker-compose.yml:1`.
 La URL de conexion esta en `ws/.env.example:5`.
-El layout completo esta en `ws/docs/structure.md:49`.
+El layout completo esta en `ws/docs/structure.md:22`.
 
 ## Schema planeado
 
@@ -53,9 +53,11 @@ La tabla de memoria semantica la gestiona la capa de memoria y tampoco Alembic.
 
 La persistencia usara `AsyncPostgresSaver` con un hilo por `thread_id`.
 El grafo recibira el checkpointer por fabrica y nunca lo importara directo.
-El patron objetivo es `make_the_agent(checkpointer)` segun `ws/docs/structure.md:128`.
+El patron objetivo es `make_the_agent(checkpointer)` segun `ws/docs/structure.md:132`.
 El checkpointer se proveera como dependencia de lifespan desde `ws/src/services/database.py:1`.
-Nunca guardes datos grandes en el estado porque quedan en los checkpoints.
+Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.
+`GraphState` en `ws/src/agent/state.py:1` usa `MessagesState` con `messages` mas lista pequena `docs`.
+Las tools `get_availability`, `book_appointment` y `get_order_status` viven en `ws/src/agent/tools/booking.py:1`.
 
 ## Migraciones con Alembic planeadas
 

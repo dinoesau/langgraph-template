@@ -8,10 +8,11 @@ Este documento describe el diseno objetivo adaptado a este starter.
 
 El registry vivira en `ws/src/services/llm/registry.py:1`.
 La logica de llamada vivira en `ws/src/services/llm/service.py:1`.
-El layout de servicios esta en `ws/docs/structure.md:49`.
+El layout de servicios esta en `ws/docs/structure.md:51`.
 El modelo por contexto se declara en `ws/src/agent/configuration.py:1`.
 Las claves de proveedor estan en `ws/.env.example:1`.
 El codigo del agente llamara a `llm_service.call(messages)` y el servicio hara el resto.
+`messages` viene de `GraphState` en `ws/src/agent/state.py:1` que usa `MessagesState` con lista pequena `docs`.
 
 ## Registry planeado
 
@@ -67,9 +68,13 @@ Si ningun modelo responde el servicio lanzara `RuntimeError`.
 ## Tools
 
 Las tools se registraran una vez al arrancar con `llm_service.bind_tools(tools)`.
-Las tools del agente viviran en `ws/src/agent/tools/:1` segun `ws/docs/structure.md:144`.
+Las tools del agente viviran en `ws/src/agent/tools/:1` segun `ws/docs/structure.md:142`.
+Son `get_availability`, `book_appointment` y `get_order_status` desde `ws/src/agent/tools/booking.py:1`.
 Al cambiar de modelo en un fallback las tools se reasociaran al modelo nuevo.
 Ese reasociado sera automatico dentro de `ws/src/services/llm/service.py:1`.
+El grafo se construye con `make_the_agent(checkpointer)` con `AsyncPostgresSaver` por `thread_id` segun `ws/docs/structure.md:132`.
+Las tablas `checkpoints`, `checkpoint_blobs` y `checkpoint_writes` las gestiona LangGraph y no Alembic.
+La memoria de largo plazo vive en `ws/src/services/memory.py:1` y no cambia el fallback.
 
 ## Structured output
 
@@ -106,4 +111,4 @@ Usa la API key del proveedor desde `ws/src/core/config.py:1`.
 ```
 
 Verifica el cambio con `uv run pytest`.
-Corre el lint con `uv run ruff check src/` segun `ws/Makefile:22`.
+Corre el lint con `uv run ruff check src/` segun `ws/Makefile:23`.
