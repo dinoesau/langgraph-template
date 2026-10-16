@@ -1,7 +1,8 @@
 # Architecture
 
 This doc shows how the starter fits together today and where it grows next.
-Only `src/agent/__init__.py:1` exists and every other block below is marked as planned.
+S0 ships the echo graph in `src/agent/graph.py:1` with state and a pure chat node.
+Every other block below is still marked as planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -9,10 +10,10 @@ The layout follows the spec in `docs/structure.md:1`.
 ```mermaid
 graph TB
     Studio["Studio (browser)"] --> Dev["Dev server"]
-    Dev --> Graph["Graph (planeado)"]
-    Graph --> Chat["chat node (planeado)"]
-    Graph --> ToolCall["tool_call node (planeado)"]
-    Chat --> LLM["LLM provider"]
+    Dev --> Graph["Graph (S0 echo)"]
+    Graph --> Chat["chat node (S0 echo)"]
+    Graph --> ToolCall["tool_call node (planeado S3)"]
+    Chat --> LLM["LLM provider (planeado)"]
     ToolCall --> Tools["tools (planeado)"]
     Graph <--> Ckpt["Checkpointer (planeado)"]
     Ckpt --> PG[("PostgreSQL (opcional)")]
@@ -29,9 +30,9 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Component | Path | Status | Responsibility |
 | --- | --- | --- | --- |
 | Deploy contract | `langgraph.json:1` | Existe | Maps the `agent` name to the graph variable and points env to `.env` |
-| Package state | `src/agent/state.py:1` | Planeado | Defines `GraphState` as the single source of truth |
-| Graph wiring | `src/agent/graph.py:1` | Planeado | Builds the `chat` to `tool_call` loop and exports `graph` |
-| Nodes | `src/agent/nodes.py:1` | Planeado | Runs LLM and tool calls and returns partial state updates |
+| Package state | `src/agent/state.py:1` | Existe | Defines `GraphState` with `messages` only |
+| Graph wiring | `src/agent/graph.py:1` | Existe | Builds single-node START to chat to END and exports `graph` |
+| Nodes | `src/agent/nodes.py:1` | Existe | Echoes the last human message with no LLM or I/O |
 | Tools | `src/agent/tools/:1` | Planeado | Holds one capability module per file behind a shared list |
 | Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
@@ -41,25 +42,33 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Services | `src/services/:1` | Planeado | Owns LLM fallback, memory, and database access |
 | Checkpointer | AsyncPostgresSaver | Planeado | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
-| Tests | `tests/unit_tests/:1` | Existe | Covers nodes, routes, and tools without model calls |
+| Tests | `tests/unit_tests/:1` | Existe | Covers the echo node and graph without model calls |
 
 ## Request lifecycle
 
-The full lifecycle is planned until `src/agent/graph.py:1` exists.
+The S0 lifecycle runs today with the echo graph in `src/agent/graph.py:1`.
 Each step below runs in order for one user message.
 
 1. Studio sends a user message to the dev server.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
-3. The `chat` node calls the LLM with the current state.
-4. The graph routes to `tool_call` when the reply contains tool calls.
-5. The checkpointer persists state per thread in Postgres.
+3. The `chat` node echoes the last human message with no LLM call.
+4. The single-node chain returns directly with no `tool_call` routing yet.
+5. No checkpointer persists state yet, so each invoke is stateless.
 6. The final message returns to Studio.
 
 Auth, rate limits, and background memory writes are planned with `src/api/` and `src/services/`.
 
 ## Agent graph
 
-The planned agent is a two-node loop.
+S0 runs a single-node chain.
+
+```mermaid
+graph LR
+    START --> chat
+    chat --> END
+```
+
+The two-node loop below is planned for S3.
 
 ```mermaid
 graph LR
@@ -69,9 +78,9 @@ graph LR
     chat -->|no tool calls| END
 ```
 
-The `chat` node answers or requests tool calls.
-The `tool_call` node runs tools concurrently and feeds results back to `chat`.
-The loop ends when the reply carries no tool calls.
+The S0 `chat` node echoes the last human message.
+The planned `tool_call` node will run tools concurrently and feed results back to `chat`.
+The planned loop ends when the reply carries no tool calls.
 
 ## Growth path
 

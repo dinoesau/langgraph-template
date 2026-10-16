@@ -4,7 +4,7 @@ This starter gives you a minimal production-minded base for LangGraph agents.
 It keeps the deploy contract small so you can grow the codebase step by step.
 It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
-Most agent features are planned and the current package is almost empty.
+S0 ships an echo graph and later milestones add tools and services.
 
 ## What's included
 
@@ -13,9 +13,9 @@ Most agent features are planned and the current package is almost empty.
 - Commands in `Makefile` wrap `uv sync`, dev server, tests, lint, and format.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
-- Planned graph loop with `chat` plus tools plus checkpointer is not implemented yet.
+- S0 echo loop in `src/agent/graph.py:1` runs START to chat to END with no tools yet.
 - Planned services for LLM fallback, memory, database, auth, and observability are not implemented yet.
-- Tests in `tests/unit_tests/` hold placeholders without model calls.
+- Tests in `tests/unit_tests/` cover the echo node and graph without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
 ## Quickstart
@@ -32,7 +32,7 @@ uv run pytest
 ```
 
 The dev server entry comes from `langgraph.json:1`.
-The graph module itself is planned and the dev server will fail until it exists.
+The graph module exports `graph` and the dev server loads it for Studio.
 Use `Makefile` when you prefer short targets for the same uv commands.
 Read `docs/structure.md:1` before adding new files so the layout stays small.
 
@@ -61,8 +61,8 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 
 ```text
 langgraph-template/
-├── src/agent/        # planned graph, state, nodes, tools, routes
-├── tests/            # unit placeholders plus integration placeholders
+├── src/agent/        # S0 echo graph, state, nodes
+├── tests/            # unit echo tests plus integration placeholders
 ├── docs/             # 13 guides: structure, examples, testing, services
 ├── langgraph.json    # deploy contract
 ├── pyproject.toml    # uv-only dependencies
@@ -78,11 +78,12 @@ Grow into `src/api/` and `src/services/` only when shipping to users.
 
 **Is this ready to deploy today?**
 No.
-The deploy contract exists but the graph module is still planned.
+The S0 echo graph runs locally in Studio and production concerns are still planned.
 
 **How do I add the first agent?**
+S0 echo already runs in `src/agent/graph.py:1`.
 Follow `docs/structure.md:1` for file roles.
-Follow `docs/examples.md:1` and build the ReAct tool agent first.
+Follow `docs/examples.md:1` and build the ReAct tool agent next.
 
 **Why uv-only?**
 One tool covers install, run, lint, and test.

@@ -2,13 +2,13 @@
 
 This guide takes a fresh checkout to the first graph answer.
 Every step uses uv only.
-The full graph is still planned and the setup below already works.
+S0 ships an echo graph and the setup below already works.
 
 ## Prerequisites
 
 - Install uv with [the official uv guide](https://docs.astral.sh/uv/).
 - Install Docker with Compose only when you want local Postgres.
-- Get a key from at least one LLM provider.
+- No LLM key is needed for the S0 echo graph.
 - Use Python 3.11 or newer as declared in `pyproject.toml:6`.
 - You need no other package manager.
 
@@ -27,7 +27,8 @@ Copy the example env file.
 cp .env.example .env
 ```
 
-Fill at least one LLM key in `.env:1`.
+No LLM key is needed for the S0 echo graph.
+`.env:1` stays optional until later milestones need providers or Postgres.
 Install dependencies with uv.
 
 ```bash
@@ -35,13 +36,14 @@ uv sync
 ```
 
 This matches the `install` target in `Makefile:8`.
-Run the placeholder tests to confirm the toolchain.
+Run the unit tests to confirm the toolchain.
 
 ```bash
 uv run pytest
 ```
 
 Start optional Postgres in the background.
+S0 needs no database and this step stays optional.
 
 ```bash
 docker compose up -d postgres
@@ -58,14 +60,13 @@ This matches the `dev` target in `Makefile:11`.
 
 ## First call
 
-The graph module `src/agent/graph.py:1` is still planned.
-Only `src/agent/__init__.py:1` exists today.
-Once the module exports `graph`, the dev server exposes Studio on the printed URL.
+The graph module `src/agent/graph.py:1` exports `graph`.
+The dev server exposes Studio on the printed URL.
 Open that Studio URL in the browser.
 Select the `agent` graph declared in `langgraph.json:1`.
 Create a thread for your first conversation.
-Send a greeting message and read the answer.
-Use the ReAct prompt in `docs/examples.md:8` for the first tool loop.
+Send a greeting message and read the echoed answer.
+The echo carries no LLM call, so no key or database is needed.
 
 ## Next steps
 
@@ -76,7 +77,7 @@ Use the ReAct prompt in `docs/examples.md:8` for the first tool loop.
 
 ## Troubleshooting
 
-The dev server reports a missing graph while `src/agent/graph.py:1` stays planned.
+The dev server reports a missing graph when `src/agent/graph.py:1` fails to export `graph`.
 The database refuses connections when Postgres is down or `POSTGRES_URI` is wrong.
 Check the container with `docker compose ps` against `docker-compose.yml:2`.
 Rerun `uv sync` when imports fail after pulling new changes.
