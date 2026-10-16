@@ -8,3 +8,17 @@
 - New valid words go to `.codespellignore`, never silence codespell inline.
 - `Makefile` help text must describe what each target actually runs.
 - Never leave `langgraph.json` graph pointers and docs pointing at different files.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context with root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.

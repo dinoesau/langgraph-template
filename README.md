@@ -53,6 +53,9 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 | [Evaluation](docs/evaluation.md) | Planned trajectory scoring and eval runs |
 | [Docker](docs/docker.md) | Planned containers and local services |
 | [Testing](docs/testing.md) | Unit, integration, and E2E layers |  
+| [Issue Tracker](docs/agents/issue-tracker.md) | GitHub Issues via `gh`, conventions and wayfinding ops |
+| [Triage Labels](docs/agents/triage-labels.md) | Canonical triage roles to tracker labels |
+| [Domain Docs](docs/agents/domain.md) | Glossary and ADR consumer rules, single-context |
 
 ## Project structure
 
