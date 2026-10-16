@@ -109,6 +109,7 @@ def test_ci_workflow_gates() -> None:
     text = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
     assert "ruff" in text
     assert "mypy" in text
+    assert "evals" in text
     assert "pytest" in text or "unit" in text
     assert "journeys" in text or "integration" in text
     assert "uv sync" in text or "setup-uv" in text
