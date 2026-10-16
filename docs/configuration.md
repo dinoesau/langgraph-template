@@ -71,11 +71,15 @@ They fail fast with a validation error on bad values.
 | `DEFAULT_LLM_MODEL` | `default-openai` | Existe | Starting model for the chat node, sets the fallback offset |
 | `MAX_LLM_CALL_RETRIES` | `3` | Existe | Attempts per model on retryable errors, 1 to 10 |
 | `LLM_TOTAL_TIMEOUT` | `60.0` | Existe | Budget in seconds for retries plus fallback, 1 to 600 |
+| `JWT_SECRET_KEY` | dev placeholder | Existe | Signs auth tokens, 32+ chars, rotate in production |
+| `JWT_ACCESS_TOKEN_EXPIRE_DAYS` | `7` | Existe | Days until user and session tokens expire, 1 to 365 |
 
 `APP_ENV` maps to `.env.example:6`.
 `LOG_LEVEL` maps to `.env.example:7`.
 `HOST` maps to `.env.example:8`.
 `PORT` maps to `.env.example:9`.
+`JWT_SECRET_KEY` maps to `.env.example:13`.
+`JWT_ACCESS_TOKEN_EXPIRE_DAYS` maps to `.env.example:14`.
 
 ## Memory and cache
 
@@ -93,8 +97,8 @@ See `docs/memory.md:1` for the full memory guide.
 | `LONG_TERM_MEMORY_MODEL` | empty | Existe | Reserved extraction model name |
 | `LONG_TERM_MEMORY_TOP_K` | `3` | Existe | Memories injected as context per turn, 1 to 20 |
 
-Requests without an identity bypass memory.
-Send `user_id` in the chat payload or `X-User-ID` as a header to enable recall.
+Chat identity always comes from the session token, so recall is scoped to the token owner.
+See `docs/authentication.md:1` for the token scopes.
 
 ## Planned settings
 
@@ -105,7 +109,6 @@ Do not rely on them until each module ships.
 | --- | --- | --- | --- |
 | `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
-| `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |
 | `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
 
 ## Validation

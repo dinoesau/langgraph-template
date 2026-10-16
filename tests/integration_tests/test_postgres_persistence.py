@@ -176,9 +176,31 @@ def test_http_thread_resumes_across_app_restart(
     monkeypatch.setenv("POSTGRES_URI", pg_uris["async"])
     get_settings.cache_clear()
     try:
-        thread = f"http-{uuid.uuid4().hex}"
 
-        async def _message_count() -> int:
+        def _auth_headers(app_client: TestClient) -> tuple[dict[str, str], str]:
+            email = f"http-{uuid.uuid4().hex}@example.com"
+            reg = app_client.post(
+                "/api/v1/auth/register",
+                json={"email": email, "password": "ChangeMe123!", "username": "http"},
+            )
+            assert reg.status_code == 200
+            login = app_client.post(
+                "/api/v1/auth/login",
+                data={"username": email, "password": "ChangeMe123!", "grant_type": "password"},
+            )
+            assert login.status_code == 200
+            user_token = str(login.json()["access_token"])
+            created = app_client.post(
+                "/api/v1/auth/session",
+                json={},
+                headers={"Authorization": f"Bearer {user_token}"},
+            )
+            assert created.status_code == 200
+            session_token = str(created.json()["token"])
+            session_id = str(created.json()["session_id"])
+            return {"Authorization": f"Bearer {session_token}"}, session_id
+
+        async def _message_count(thread: str) -> int:
             async with AsyncPostgresSaver.from_conn_string(pg_uris["async"]) as saver:
                 state = await saver.aget_tuple(_aconfig(thread))
                 assert state is not None
@@ -187,17 +209,19 @@ def test_http_thread_resumes_across_app_restart(
 
         with TestClient(create_app()) as first:
             assert first.get("/health").json()["dependencies"]["store"] == "ready"
+            headers, thread = _auth_headers(first)
             assert first.post(
-                "/api/v1/chat", json={"message": "hello", "thread_id": thread}
+                "/api/v1/chat", json={"message": "hello"}, headers=headers
             ).json() == {"reply": "hello", "thread_id": thread}
-            assert first.post(
-                "/api/v1/chat", json={"message": "again", "thread_id": thread}
-            ).json() == {"reply": "again", "thread_id": thread}
+            second_reply = first.post("/api/v1/chat", json={"message": "again"}, headers=headers)
+            assert second_reply.json()["thread_id"] == thread
+            assert "again" in second_reply.json()["reply"]
         with TestClient(create_app()) as second:
             assert second.get("/health").json()["dependencies"]["store"] == "ready"
-            reply = second.post("/api/v1/chat", json={"message": "third", "thread_id": thread})
-            assert reply.json() == {"reply": "third", "thread_id": thread}
-        assert asyncio.run(_message_count()) == 6
+            reply = second.post("/api/v1/chat", json={"message": "third"}, headers=headers)
+            assert reply.json()["thread_id"] == thread
+            assert "third" in reply.json()["reply"]
+        assert asyncio.run(_message_count(thread)) == 6
     finally:
         monkeypatch.undo()
         get_settings.cache_clear()

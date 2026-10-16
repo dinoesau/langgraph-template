@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     DEFAULT_LLM_MODEL: str = "default-openai"
     MAX_LLM_CALL_RETRIES: int = Field(default=3, ge=1, le=10)
     LLM_TOTAL_TIMEOUT: float = Field(default=60.0, ge=1.0, le=600.0)
+    JWT_SECRET_KEY: str = Field(
+        default="dev-only-secret-key-change-in-production-0123456789",
+        min_length=32,
+    )
+    JWT_ACCESS_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, le=365)
     CACHE_TTL_SECONDS: int = Field(default=60, ge=1, le=3600)
     VALKEY_HOST: str = ""
     VALKEY_PORT: int = Field(default=6379, ge=1, le=65535)

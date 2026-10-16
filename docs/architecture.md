@@ -6,7 +6,8 @@ S1 adds the HTTP skeleton in `src/api/app.py:1` with typed settings.
 S2a adds persisted threads with a lifespan checkpointer plus app migrations.
 S2b adds per-user semantic memory with a shared cache front plus background writes.
 S3 adds the chat to tool to chat loop with model retries and fallback.
-Auth and observability are still marked as planned.
+S4 adds auth with scoped JWTs.
+Observability is still marked as planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -73,7 +74,7 @@ The S1 HTTP lifecycle runs through `src/api/app.py:1`.
 4. The reply returns with `thread_id` pass-through plus `X-Request-ID`; stream SSE data events carry `thread_id` and end with `[DONE]`.
 5. `GET /health` returns status ok plus dependencies (`loop: ok`, `store: ready` or `not_configured` or `unavailable`, `cache: ready` or `not_configured` or `unavailable`). `GET /metrics` returns the stub.
 
-Auth and rate limits are planned with `src/services/`; background memory writes are live in S2b.
+Auth rides the session token per `docs/authentication.md:1`; rate limits stay planned; background memory writes are live in S2b.
 
 ## Agent graph
 
