@@ -1,17 +1,17 @@
 # Database
 
-Estado: implementado en S2a.
-El schema de app, las migraciones y el checkpointer ya existen.
-pgvector sigue planeado para la memoria en el ticket #5.
+Status: implemented in S2a.
+The app schema, the migrations, and the checkpointer already exist.
+pgvector remains planned for memory under ticket #5.
 
-## Donde vive
+## Where it lives
 
-Los modelos ORM viven en `ws/src/models/:1`.
-El acceso a datos vive en `ws/src/services/database.py:1`.
-Las migraciones viven en `ws/alembic/:1`.
-La conexion local esta en `ws/docker-compose.yml:1`.
-La URL de conexion esta en `ws/.env.example:5`.
-El layout completo esta en `ws/docs/structure.md:22`.
+The ORM models live in `ws/src/models/:1`.
+Data access lives in `ws/src/services/database.py:1`.
+Migrations live in `ws/alembic/:1`.
+The local connection is in `ws/docker-compose.yml:1`.
+The connection URL is in `ws/.env.example:5`.
+The full layout is in `ws/docs/structure.md:22`.
 
 ## Schema
 
@@ -36,62 +36,62 @@ erDiagram
     }
 ```
 
-User representa una cuenta con email unico.
-Session representa una conversacion y un usuario puede tener muchas.
-Session copia el username al crearse para evitar una lectura extra en cada chat.
-No hay tabla Thread de app: el `thread_id` del loop vive en la tabla `checkpoints` que gestiona LangGraph.
-Las tablas del checkpointer las gestiona LangGraph y no Alembic.
-Esas tablas son `checkpoints`, `checkpoint_blobs` y `checkpoint_writes`.
-La tabla de memoria semantica la gestionara la capa de memoria y tampoco Alembic.
+User represents one account with a unique email.
+Session represents one conversation, and one user can own many.
+Session copies the username at creation to avoid one extra read on each chat.
+There is no app Thread table: the loop `thread_id` lives in the `checkpoints` table managed by LangGraph.
+The checkpointer tables are managed by LangGraph and not by Alembic.
+Those tables are `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes`.
+The semantic memory table is managed by the memory layer and not by Alembic either.
 
 ## Checkpointer
 
-La persistencia usa `AsyncPostgresSaver` con un hilo por `thread_id`.
-El grafo recibe el checkpointer por fabrica y nunca lo importa directo.
-La fabrica es `make_the_agent(checkpointer)` segun `ws/docs/structure.md:132`.
-El checkpointer se provee como dependencia de lifespan desde `ws/src/services/database.py:1`.
-El lifespan crea las tablas del checkpointer con `setup()` y compila el grafo una vez.
-Sin `POSTGRES_URI` el estado es `not_configured` y con caida es `unavailable`; en ambos el chat sigue sin persistencia.
-`GET /health` reporta ese estado en `dependencies.store`.
-Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.
-`GraphState` en `ws/src/agent/state.py:1` usa `MessagesState` solo con `messages`.
-Las tools `get_availability`, `book_appointment` y `get_order_status` viven en `ws/src/agent/tools/booking.py:1`.
+Persistence uses `AsyncPostgresSaver` with one thread per `thread_id`.
+The graph receives the checkpointer through a factory and never imports it directly.
+The factory is `make_the_agent(checkpointer)` per `ws/docs/structure.md:132`.
+The checkpointer is provided as a lifespan dependency from `ws/src/services/database.py:1`.
+The lifespan creates the checkpointer tables with `setup()` and compiles the graph once.
+Without `POSTGRES_URI` the state is `not_configured`, and on failure it is `unavailable`, and chat keeps running without persistence in both cases.
+`GET /health` reports that state in `dependencies.store`.
+Never store large payloads in `GraphState` because they persist inside checkpoints.
+`GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages` only.
+The `get_availability`, `book_appointment`, and `get_order_status` tools live in `ws/src/agent/tools/booking.py:1`.
 
-## Migraciones con Alembic
+## Migrations with Alembic
 
-Alembic es dueno del schema de app.
-La migracion `0001_create_users_sessions` crea `users` y `sessions`.
-La app nunca llama a `create_all()` en el arranque.
-Aplica las migraciones con `uv run alembic upgrade head` o `make migrate`.
-Genera una migracion con `uv run alembic revision --autogenerate -m "describe el cambio"`.
-Revisa el archivo generado en `ws/alembic/versions/:1` antes de aplicarlo.
-Retrocede una migracion con `uv run alembic downgrade -1`.
-Muestra el historial con `uv run alembic history` o `make migrate_history`.
-Alembic lee la URL desde `ws/.env.example:5` via `POSTGRES_URI` o `ws/src/core/config.py:1`.
-Los atajos de Makefile para migraciones son `migrate` y `migrate_history`.
+Alembic owns the app schema.
+The `0001_create_users_sessions` migration creates `users` and `sessions`.
+The app never calls `create_all()` at startup.
+Apply migrations with `uv run alembic upgrade head` or `make migrate`.
+Generate a migration with `uv run alembic revision --autogenerate -m "describe the change"`.
+Review the generated file in `ws/alembic/versions/:1` before applying it.
+Roll back one migration with `uv run alembic downgrade -1`.
+Show history with `uv run alembic history` or `make migrate_history`.
+Alembic reads the URL from `ws/.env.example:5` through `POSTGRES_URI` or `ws/src/core/config.py:1`.
+The Makefile shortcuts for migrations are `migrate` and `migrate_history`.
 
-### Como funciona autogenerate
+### How autogenerate works
 
-El archivo `ws/alembic/env.py:1` importa todos los modelos para registrar sus metadatos.
-Alembic compara el schema de la base contra los modelos y genera upgrade y downgrade.
-La funcion `include_object` en `ws/alembic/env.py:1` excluye tablas externas.
-Las tablas excluidas son las del checkpointer y las de memoria semantica.
-Asi Alembic nunca toca lo que gestionan LangGraph o la capa de memoria.
+The `ws/alembic/env.py:1` file imports every model to register its metadata.
+Alembic compares the database schema against the models and generates upgrade and downgrade.
+The `include_object` function in `ws/alembic/env.py:1` excludes external tables.
+The excluded tables are the checkpointer tables and the semantic memory tables.
+So Alembic never touches what LangGraph or the memory layer manages.
 
-### Agregar un modelo nuevo
+### Adding a new model
 
-Crea el modelo en `ws/src/models/:1`.
-Importalo en `ws/alembic/env.py:1` junto a los demas modelos.
-Genera la migracion con `uv run alembic revision --autogenerate -m "add your_model table"`.
-Aplica la migracion con `uv run alembic upgrade head`.
+Create the model in `ws/src/models/:1`.
+Import it in `ws/alembic/env.py:1` next to the other models.
+Generate the migration with `uv run alembic revision --autogenerate -m "add your_model table"`.
+Apply the migration with `uv run alembic upgrade head`.
 
-## Postgres y pgvector
+## Postgres and pgvector
 
-El servicio local esta definido en `ws/docker-compose.yml:1`.
-Hoy usa `postgres:15-alpine` sin extension vectorial.
-El cambio a una imagen con pgvector queda diferido al ticket #5 de memoria.
-La extension se habilitara con `CREATE EXTENSION IF NOT EXISTS vector` antes de migrar.
-Con Docker ese paso sera automatico en el servicio de base de datos.
-En bases externas habilita la extension desde el panel o el editor SQL.
-La memoria semantica de largo plazo usara pgvector y vive en `ws/src/services/memory.py:1`.
-Esa capa aun no existe y sigue planeada.
+The local service is defined in `ws/docker-compose.yml:1`.
+Today it uses `postgres:15-alpine` without a vector extension.
+The move to a pgvector image stays deferred to the memory ticket #5.
+The extension is enabled with `CREATE EXTENSION IF NOT EXISTS vector` before migrating.
+Under Docker that step is automatic in the database service.
+On external databases enable the extension from the dashboard or the SQL editor.
+Long term semantic memory will use pgvector and lives in `ws/src/services/memory.py:1`.
+That layer does not exist yet and remains planned.

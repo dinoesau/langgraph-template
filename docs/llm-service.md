@@ -1,24 +1,24 @@
 # LLM Service
 
-Estado: implementado.
-El registry, los reintentos y el fallback estan en vivo detras de `llm_service.call`.
-Este documento describe el diseno implementado adaptado a este starter.
+Status: implemented.
+The registry, the retries, and the fallback are live behind `llm_service.call`.
+This document describes the implemented design adapted to this starter.
 
-## Donde vive
+## Where it lives
 
-El registry vive en `ws/src/services/llm/registry.py:1`.
-La logica de llamada vive en `ws/src/services/llm/service.py:1`.
-El layout de servicios esta en `ws/docs/structure.md:51`.
-El modelo por contexto se declara en `ws/src/agent/configuration.py:1`.
-Las claves de proveedor estan en `ws/.env.example:1`.
-El codigo del agente llama a `llm_service.call(messages)` y el servicio se encarga del resto.
-`messages` viene de `GraphState` en `ws/src/agent/state.py:1` que usa `MessagesState` con lista pequena `docs`.
+The registry lives in `ws/src/services/llm/registry.py:1`.
+The call logic lives in `ws/src/services/llm/service.py:1`.
+The service layout is in `ws/docs/structure.md:51`.
+The model per context is declared in `ws/src/agent/configuration.py:1`.
+The provider keys are in `ws/.env.example:1`.
+Agent code calls `llm_service.call(messages)` and the service handles the rest.
+`messages` comes from `GraphState` in `ws/src/agent/state.py:1`, which uses `MessagesState` with a small `docs` list.
 
-## Registry planeado
+## Planned registry
 
-Los modelos se definen en orden de preferencia en `ws/src/services/llm/registry.py:1`.
-El modelo inicial se elige con `DEFAULT_LLM_MODEL` en `ws/src/core/config.py:1`.
-Para agregar o cambiar modelos edita la lista del registry.
+Models are defined in preference order in `ws/src/services/llm/registry.py:1`.
+The starting model is selected with `DEFAULT_LLM_MODEL` in `ws/src/core/config.py:1`.
+To add or change models edit the registry list.
 
 | Name | Provider | Notes |
 | ---- | -------- | ----- |
@@ -26,11 +26,11 @@ Para agregar o cambiar modelos edita la lista del registry.
 | `fallback-anthropic` | Anthropic | First fallback, uses `ANTHROPIC_API_KEY` |
 | `fallback-google` | Google | Second fallback, uses `GOOGLE_API_KEY` |
 
-Las claves ya existen en `ws/.env.example:1`.
-El orden de la lista define el orden del fallback.
-El nombre elegido en `DEFAULT_LLM_MODEL` define por donde empieza el ciclo.
+The keys already exist in `ws/.env.example:1`.
+The list order defines the fallback order.
+The name selected in `DEFAULT_LLM_MODEL` defines where the cycle starts.
 
-## Reintentos y fallback circular
+## Circular retries and fallback
 
 ```mermaid
 flowchart TD
@@ -56,31 +56,31 @@ flowchart TD
     Try -->|success| Success
 ```
 
-Cada modelo reintenta con backoff exponencial entre 2 y 10 segundos.
-El maximo de intentos por modelo es `MAX_LLM_CALL_RETRIES` con valor 3.
-Solo se reintentan errores de rate limit, timeout y errores de API.
-Los errores no reintentables fallan rapido sin pasar al siguiente modelo.
-Un presupuesto total de `LLM_TOTAL_TIMEOUT` con valor 60 segundos limita todo el ciclo.
-Sin ese presupuesto el peor caso sumaria reintentos por modelos por esperas y superaria los 2 minutos.
-El fallback recorre la lista en orden circular y se detiene tras un ciclo completo.
-Los modelos sin clave o sin paquete se omiten con un aviso en el log.
-Si ningun modelo responde el servicio lanza `RuntimeError`.
+Each model retries with exponential backoff between 2 and 10 seconds.
+The maximum attempts per model is `MAX_LLM_CALL_RETRIES` with value 3.
+Only rate limit, timeout, and API errors are retried.
+Non-retryable errors fail fast without moving to the next model.
+A total budget of `LLM_TOTAL_TIMEOUT` with value 60 seconds bounds the whole cycle.
+Without that budget the worst case would add retries times models times waits and would exceed 2 minutes.
+Fallback walks the list in circular order and stops after one full cycle.
+Models without a key or without a package are skipped with a log warning.
+When no model answers the service raises `RuntimeError`.
 
 ## Tools
 
-Las tools se registran una vez al arrancar con `llm_service.bind_tools(tools)`.
-Las tools del agente viven en `ws/src/agent/tools/:1` segun `ws/docs/structure.md:142`.
-Son `get_availability`, `book_appointment` y `get_order_status` desde `ws/src/agent/tools/booking.py:1`.
-Al cambiar de modelo en un fallback las tools se reasocian al modelo nuevo.
-Ese reasociado es automatico dentro de `ws/src/services/llm/service.py:1`.
-El grafo se construye con `make_the_agent(checkpointer)` con `AsyncPostgresSaver` por `thread_id` segun `ws/docs/structure.md:132`.
-Las tablas `checkpoints`, `checkpoint_blobs` y `checkpoint_writes` las gestiona LangGraph y no Alembic.
-La memoria de largo plazo vive en `ws/src/services/memory.py:1` y no cambia el fallback.
+Tools are registered once at startup with `llm_service.bind_tools(tools)`.
+The agent tools live in `ws/src/agent/tools/:1` per `ws/docs/structure.md:142`.
+They are `get_availability`, `book_appointment`, and `get_order_status` from `ws/src/agent/tools/booking.py:1`.
+On a fallback model switch the tools are rebound to the new model.
+That rebinding is automatic inside `ws/src/services/llm/service.py:1`.
+The graph is built with `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `thread_id` per `ws/docs/structure.md:132`.
+The `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` tables are managed by LangGraph and not by Alembic.
+Long term memory lives in `ws/src/services/memory.py:1` and does not change the fallback.
 
 ## Structured output
 
-Pasa un modelo Pydantic como `response_format` para recibir una instancia validada.
-Sin `response_format` el servicio devuelve el mensaje base sin validar.
+Pass a Pydantic model as `response_format` to receive a validated instance.
+Without `response_format` the service returns the base message without validation.
 
 ```python
 result = await llm_service.call(
@@ -91,28 +91,28 @@ result = await llm_service.call(
 )
 ```
 
-El servicio encadena `with_structured_output(schema)` sobre el modelo resuelto.
-Ese encadenado se repite en cada reintento y en cada cambio de modelo.
-Asi los reintentos y el fallback funcionan sin codigo extra en el agente.
+The service chains `with_structured_output(schema)` over the resolved model.
+That chaining repeats on every retry and on every model switch.
+So retries and fallback work with no extra code in the agent.
 
-## Paquetes de proveedor
+## Provider packages
 
-El registry importa cada chat model de forma diferida.
-Instala el paquete del proveedor antes de usar su modelo.
+The registry imports each chat model lazily.
+Install the provider package before using its model.
 
-| Modelo | Paquete | Clase |
+| Model | Package | Class |
 | ---- | ------- | ----- |
 | `default-openai` | `langchain-openai` | `ChatOpenAI` (`gpt-4o-mini`) |
 | `fallback-anthropic` | `langchain-anthropic` | `ChatAnthropic` (`claude-sonnet-4-5-20250929`) |
 | `fallback-google` | `langchain-google-genai` | `ChatGoogleGenerativeAI` (`gemini-2.5-flash`) |
 
-Sin el paquete o sin la clave el modelo se omite del ciclo con un aviso.
+Without the package or without the key the model is skipped from the cycle with a warning.
 
-## Agregar un modelo nuevo
+## Adding a new model
 
-Agrega la entrada en la lista de `ws/src/services/llm/registry.py:1`.
-La posicion en la lista define cuando entra en el fallback.
-Usa la API key del proveedor desde `ws/src/core/config.py:1`.
+Add the entry in the `ws/src/services/llm/registry.py:1` list.
+The position in the list defines when it enters the fallback.
+Use the provider API key from `ws/src/core/config.py:1`.
 
 ```python
 {
@@ -124,5 +124,5 @@ Usa la API key del proveedor desde `ws/src/core/config.py:1`.
 },
 ```
 
-Verifica el cambio con `uv run pytest`.
-Corre el lint con `uv run ruff check src/` segun `ws/Makefile:23`.
+Verify the change with `uv run pytest`.
+Run lint with `uv run ruff check src/` per `ws/Makefile:23`.

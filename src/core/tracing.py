@@ -10,6 +10,7 @@ without a code change through ``LANGFUSE_TRACING_ENABLED=false``.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -18,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import BaseMessage
+
+logger = logging.getLogger(__name__)
 
 _MAX_BUFFER = 500
 
@@ -191,4 +194,4 @@ def _maybe_persist(record: TraceRecord) -> None:
         with target.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(asdict(record)) + "\n")
     except OSError:
-        pass
+        logger.warning("trace_persist_failed", exc_info=True)
