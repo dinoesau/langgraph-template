@@ -24,11 +24,15 @@ These tests may call real models, so they cost time and money and never run by d
 
 ## 3. End-to-end tests: the full stack
 
-E2E tests will simulate a real user against the entire running stack.
-That full stack is planned and does not exist yet.
-Bring it up with a full `docker compose up` once it lands: API server plus real postgres plus planned cache.
+API journeys prove a real user against the full running stack over HTTP.
+The suite lives in `tests/integration_tests/test_api_journeys.py:1` and runs via `make integration_tests`.
+Each run uses an ephemeral pgvector Postgres on a random host port with a dedicated test database.
+Set `TEST_POSTGRES_URI` to reuse a compose override store instead of spinning a container.
+The lifespan wires the real checkpointer, memory, and cache against that store only.
+Each test seeds predictable users with fresh session threads through register plus login.
+Journeys cover auth lifecycle, chat with thread resume across restart, history isolation across users, and 401 plus 403 plus 404 plus 422 cases.
+The loop answers through a fake echo, so the suite stays network-free apart from the ephemeral store.
+The container stops after the module, so local development data is never polluted.
 Drive the stack over HTTP against `POST /api/v1/chat` with a session token.
-See `ws/docs/authentication.md:1` for the auth flow.
-Seed the database with a known predictable state before the suite runs.
-Tear the stack down after, so local development data is never polluted.
+See `docs/authentication.md:1` for the auth flow.
 There is no frontend in this repo, so E2E means API-level journeys, not browser automation.
