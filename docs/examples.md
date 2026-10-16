@@ -1,9 +1,9 @@
-# EXAMPLES
+# Examples
 
 This file specs the five example agents to build in this repo.
 Each one demonstrates a core LangGraph workflow pattern.
 None is implemented yet; build in order, router last.
-All examples live under `src/agent/` until a second agent forces the `src/agents/<name>/` split.
+All examples live under `src/agent/`; extra specialists join as subgraph nodes sharing `GraphState`.
 
 ## 1. ReAct tool agent
 

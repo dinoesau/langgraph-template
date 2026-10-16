@@ -1,0 +1,73 @@
+# Configuration
+
+All settings come from environment variables.
+Local dev reads `.env` through the pointer in `langgraph.json:1`.
+Typed settings in `src/core/config.py:1` are still planned.
+
+## Setup
+
+Copy the template file to create your local env.
+
+```bash
+cp .env.example .env
+```
+
+The template lives in `.env.example:1`.
+Never commit `.env` to git.
+Production sets real values in the deploy environment instead.
+
+## LLM keys
+
+Set at least one provider key before starting the dev server.
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `OPENAI_API_KEY` | empty | one of the three | Key for OpenAI models |
+| `ANTHROPIC_API_KEY` | empty | one of the three | Key for Anthropic models |
+| `GOOGLE_API_KEY` | empty | one of the three | Key for Google models |
+| `LANGSMITH_API_KEY` | empty | no | Enables LangSmith tracing when set |
+
+Each key maps to line 1 to 4 of `.env.example:1`.
+
+## Database
+
+Postgres is optional and local dev works without it.
+The graph runs without persistence until the checkpointer lands.
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `POSTGRES_URI` | `postgresql://postgres:postgres@localhost:5432/postgres` | no | Full connection string for local dev |
+| `POSTGRES_USER` | `postgres` | no | User for the compose service |
+| `POSTGRES_PASSWORD` | `postgres` | no | Password for the compose service |
+| `POSTGRES_DB` | `postgres` | no | Database name for the compose service |
+
+`POSTGRES_URI` maps to `.env.example:5`.
+The compose values map to `docker-compose.yml:6` through `docker-compose.yml:9`.
+Start the service when you need persistence.
+
+```bash
+docker compose up -d postgres
+```
+
+## Planned settings
+
+These names are reserved for `src/core/config.py:1` and have no effect today.
+Do not rely on them until the settings module ships.
+
+| Variable | Default | Status | Description |
+| --- | --- | --- | --- |
+| `APP_ENV` | planeado | planeado | Selects development, staging, or production behavior |
+| `LOG_LEVEL` | planeado | planeado | Controls console verbosity for local runs |
+| `DEFAULT_LLM_MODEL` | planeado | planeado | Starting model for the chat node |
+| `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
+| `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
+| `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |
+| `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
+| `VALKEY_HOST` | planeado | planeado | Enables shared cache once the cache service exists |
+
+## Validation
+
+Run `uv run pytest` to confirm the toolchain.
+Run `docker compose ps` to confirm Postgres.
+Open the Studio URL to confirm the graph once `src/agent/graph.py:1` exists.
+Reread `docs/getting-started.md:1` when any step fails.

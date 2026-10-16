@@ -36,3 +36,6 @@ data/
 pgdata/
 *.sqlite3
 *.db
+
+# LangGraph dev local (genera `langgraph dev`)
+.langgraph_api/
