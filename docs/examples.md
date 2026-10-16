@@ -18,10 +18,12 @@ Done when the agent books a slot and confirms time back to the user.
 
 ## 2. RAG assistant
 
-Answers "what is your refund policy" via `retrieve -> generate` nodes.
+Status: implemented.
+Answers "what is your refund policy" via `retrieve -> generate` nodes in `ws/src/agent/rag.py:1`.
 `GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-The retriever returns top-k chunks for the last user message only.
-The generator cites `docs` for facts and uses long term memory only as extra context from `ws/src/services/memory.py:1`.
+The retriever in `ws/src/services/retrieval.py:1` returns top-k chunks for the last user message only.
+The generator cites `docs` for facts, says "I don't know" when unsupported, and uses long term memory only as extra context from `ws/src/services/memory.py:1`.
+Memory never overrides retrieved grounding: the prompt labels passages authoritative and memory background only.
 Done when an off-policy question gets "I don't know" instead of a hallucinated answer.
 
 ## 3. Router / triage
