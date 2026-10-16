@@ -42,3 +42,8 @@ pgdata/
 
 # LangGraph dev local (genera `langgraph dev`)
 .langgraph_api/
+
+# Evals (ws/docs/evaluation.md:1 genera reportes por corrida, no se commitean)
+evals/reports/*.json
+profiles/
+traces.jsonl
