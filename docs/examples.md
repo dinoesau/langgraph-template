@@ -40,10 +40,13 @@ Done when the card contains all three fields plus the ticket id.
 
 ## 5. Evaluator-optimizer
 
+Status: implemented.
 A `generator` node drafts the reply and a `grader` node checks it via `llm_service.call` with `response_format`.
 The service applies `with_structured_output` internally per `ws/src/services/llm/service.py:1`.
+The verdict shape is `GradeDecision` in `ws/src/agent/nodes.py:1` with `approved` plus `feedback`.
 On reject, the grader feedback routes back to the generator for another draft.
-Guard iterations below 3, else accept the last draft to avoid infinite loops.
+Guard iterations below 3 in `ws/src/agent/routes.py:1`, else accept the last draft to avoid infinite loops.
+The loop compiles via `make_evaluator_agent` in `ws/src/agent/graph.py:1` sharing `GraphState`.
 Done when a rude first draft converges to an approved reply within the guard.
 
 ## Shared wiring

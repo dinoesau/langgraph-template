@@ -1,11 +1,12 @@
-"""S3 loop nodes: one LLM chat step plus concurrent tool execution."""
+"""S3 loop nodes plus the S5d generator/grader evaluator loop."""
 
 import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from pydantic import BaseModel, Field
 
 from src.agent.state import GraphState
 from src.agent.tools import tools
@@ -16,6 +17,15 @@ logger = logging.getLogger(__name__)
 llm_service.bind_tools(tools)
 
 _tools_by_name = {tool.name: tool for tool in tools}
+
+MAX_GRADER_ITERATIONS = 3
+
+
+class GradeDecision(BaseModel):
+    """Validated grader verdict; the LLM must return this shape."""
+
+    approved: bool = Field(description="True when the draft is ready to send.")
+    feedback: str = Field(default="", description="Revision hint used on reject.")
 
 
 async def chat(state: GraphState) -> dict[str, list[BaseMessage]]:
@@ -55,3 +65,40 @@ async def _run_one(call: Mapping[str, Any]) -> ToolMessage:
             result = ToolMessage(content=result.content, tool_call_id=call_id, name=name)
         return result
     return ToolMessage(content=str(result), tool_call_id=call_id, name=name)
+
+
+async def generator(state: GraphState) -> dict[str, Any]:
+    """Draft one reply; the grader feedback already sits in messages on retry."""
+    response = await llm_service.call(state["messages"])
+    attempts = int(state.get("attempts", 0)) + 1
+    if isinstance(response, AIMessage):
+        draft = response
+    elif isinstance(response, BaseMessage):
+        draft = AIMessage(content=str(response.content))
+    else:
+        draft = AIMessage(content=str(response))
+    return {"messages": [draft], "attempts": attempts}
+
+
+async def grader(state: GraphState) -> dict[str, Any]:
+    """Check the last draft via validated structured output."""
+    decision = await llm_service.call(state["messages"], response_format=GradeDecision)
+    if isinstance(decision, GradeDecision):
+        approved = decision.approved
+        feedback = decision.feedback
+    elif isinstance(decision, dict):
+        approved = bool(decision.get("approved", False))
+        feedback = str(decision.get("feedback", ""))
+    else:
+        approved = bool(getattr(decision, "approved", False))
+        feedback = str(getattr(decision, "feedback", ""))
+    if approved:
+        return {"approved": True, "feedback": ""}
+    hint = feedback.strip() or "Revise the draft to be polite and helpful."
+    if int(state.get("attempts", 0)) >= MAX_GRADER_ITERATIONS:
+        return {"approved": False, "feedback": hint}
+    return {
+        "approved": False,
+        "feedback": hint,
+        "messages": [HumanMessage(content=hint)],
+    }
