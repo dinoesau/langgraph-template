@@ -22,7 +22,7 @@ graph TD
 ## Complete structure
 
 ```text
-langgraph-base/
+langgraph-template/
 ├── src/
 │   ├── agent/
 │   │   ├── __init__.py

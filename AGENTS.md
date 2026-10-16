@@ -1,4 +1,4 @@
-# AGENTS.md - langgraph-base
+# AGENTS.md - langgraph-template
 
 ## Docs (keep them current, no exceptions)
 

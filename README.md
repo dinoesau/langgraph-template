@@ -60,7 +60,7 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 ## Project structure
 
 ```text
-langgraph-base/
+langgraph-template/
 ├── src/agent/        # planned graph, state, nodes, tools, routes
 ├── tests/            # unit placeholders plus integration placeholders
 ├── docs/             # 13 guides: structure, examples, testing, services

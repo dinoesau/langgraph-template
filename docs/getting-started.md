@@ -17,8 +17,8 @@ The full graph is still planned and the setup below already works.
 Clone the repository and enter the folder.
 
 ```bash
-git clone <your-repo-url> langgraph-base
-cd langgraph-base
+git clone <your-repo-url> langgraph-template
+cd langgraph-template
 ```
 
 Copy the example env file.
