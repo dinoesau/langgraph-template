@@ -1,5 +1,5 @@
 [project]
-name = "langgraph-base"
+name = "langgraph-template"
 version = "0.1.0"
 description = "Minimal LangGraph starter"
 readme = "README.md"
