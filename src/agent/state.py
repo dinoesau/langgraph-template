@@ -4,8 +4,9 @@ from langgraph.graph import MessagesState
 
 
 class GraphState(MessagesState):
-    """Single source of truth for the chat loop and the S5d grader loop."""
+    """Single source of truth for the chat loop plus S5a RAG docs plus S5d grader loop."""
 
+    docs: NotRequired[list[str]]
     attempts: NotRequired[int]
     approved: NotRequired[bool]
     feedback: NotRequired[str]

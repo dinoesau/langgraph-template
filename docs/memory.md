@@ -105,6 +105,13 @@ Requests without an identity (`anonymous`, no `user_id` and no `X-User-ID`) bypa
 That bypass keeps one shared anonymous id from leaking memories across users.
 Session scope still comes from `thread_id` in the checkpointer.
 
+## Grounding rule
+
+Retrieved passages always win over recalled memories.
+The RAG generator in `ws/src/agent/rag.py:1` answers only from `docs` and cites them.
+Memory from `ws/src/services/memory.py:1` arrives as extra background only and never overrides grounding.
+When passages do not support the answer the generator replies "I don't know" instead of hallucinating.
+
 ## What exists today
 
 `ws/docker-compose.yml:1` starts pgvector postgres on port 5432 plus Valkey on port 6379.
