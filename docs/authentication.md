@@ -1,22 +1,22 @@
 # Authentication
 
-Estado: live.
-El flujo JWT y los endpoints estan implementados en `src/api/v1/auth.py:1`.
-Los guards de alcance viven en `src/api/deps.py:1`.
+Status: live.
+The JWT flow and the endpoints are implemented in `src/api/v1/auth.py:1`.
+The scope guards live in `src/api/deps.py:1`.
 
-## Donde vive
+## Where it lives
 
-La capa HTTP vive en `src/api/v1/auth.py:1`.
-Los guards de token viven en `src/api/deps.py:1`.
-La configuracion JWT vive en `src/core/config.py:1`.
-El hashing y los JWT viven en `src/core/security.py:1`.
-El rate limit vive en `src/core/limiter.py:1`.
-Los modelos ORM viven en `src/models/:1`.
-Los esquemas Pydantic viven en `src/schemas/auth.py:1`.
-El layout completo esta en `docs/structure.md:39`.
-Nunca expongas modelos ORM directo en la API.
+The HTTP layer lives in `src/api/v1/auth.py:1`.
+The token guards live in `src/api/deps.py:1`.
+The JWT configuration lives in `src/core/config.py:1`.
+Hashing and JWT handling live in `src/core/security.py:1`.
+Rate limiting lives in `src/core/limiter.py:1`.
+The ORM models live in `src/models/:1`.
+The Pydantic schemas live in `src/schemas/auth.py:1`.
+The full layout is in `docs/structure.md:39`.
+Never expose ORM models directly in the API.
 
-## Flujo
+## Flow
 
 ```mermaid
 sequenceDiagram
@@ -36,22 +36,22 @@ sequenceDiagram
     A-->>C: {reply, thread_id}
 ```
 
-La API usa dos alcances de token.
-El token de usuario identifica a la persona y sirve para crear y listar sesiones.
-El token de sesion identifica una conversacion y es obligatorio en los endpoints de chat.
-Ambos son JWT firmados con HS256 y expiracion configurable.
-El chat valida el token por firma y fija el thread al `sid` del token.
-Sin token la respuesta es 401; con alcance equivocado es 403.
+The API uses two token scopes.
+The user token identifies the person and is used to create and list sessions.
+The session token identifies one conversation and is required on chat endpoints.
+Both are JWTs signed with HS256 and configurable expiration.
+Chat validates the token by signature and pins the thread to the token `sid`.
+A missing token returns 401, and a wrong scope returns 403.
 
 ## Endpoints
 
 ### `POST /api/v1/auth/register`
 
-Crea una cuenta nueva con email, password y username opcional.
-Devuelve `200` con `user_id`, `email`, `username`, `access_token` y `expires_at`.
-El password requiere 8 o mas caracteres con mayuscula, minuscula, numero y simbolo; si falla es 422.
-El email se normaliza a minusculas; duplicado devuelve 409.
-El username se copia a cada sesion para personalizar las respuestas.
+Creates a new account with email, password, and optional username.
+Returns `200` with `user_id`, `email`, `username`, `access_token`, and `expires_at`.
+The password requires 8 or more characters with uppercase, lowercase, digit, and symbol, and a weak password returns 422.
+The email is normalized to lowercase, and a duplicate returns 409.
+The username is copied to each session to personalize replies.
 
 ```json
 {
@@ -63,10 +63,10 @@ El username se copia a cada sesion para personalizar las respuestas.
 
 ### `POST /api/v1/auth/login`
 
-Intercambia credenciales por un token de usuario con formato OAuth2 password grant.
-Acepta `username` o `email` mas `password`; usa `grant_type=password`.
-Devuelve `200` con `access_token`, `token_type` y `expires_at`.
-Credenciales invalidas devuelven 401 sin revelar que campo fallo.
+Exchanges credentials for a user token using the OAuth2 password grant shape.
+Accepts `username` or `email` plus `password`, and uses `grant_type=password`.
+Returns `200` with `access_token`, `token_type`, and `expires_at`.
+Invalid credentials return 401 without revealing which field failed.
 
 ```bash
 curl -X POST /api/v1/auth/login \
@@ -77,10 +77,10 @@ curl -X POST /api/v1/auth/login \
 
 ### `POST /api/v1/auth/session`
 
-Crea una sesion de chat nueva y requiere un token de usuario valido.
-Acepta un cuerpo JSON opcional con `name`.
-Devuelve `200` con `session_id`, `token` de alcance sesion y `expires_at`.
-Sin token es 401; con token de sesion es 403.
+Creates a new chat session and requires a valid user token.
+Accepts an optional JSON body with `name`.
+Returns `200` with `session_id`, a session-scoped `token`, and `expires_at`.
+A missing token returns 401, and a session token returns 403.
 
 ```bash
 curl -X POST /api/v1/auth/session \
@@ -91,9 +91,9 @@ curl -X POST /api/v1/auth/session \
 
 ### `PATCH /api/v1/auth/session/{session_id}/name`
 
-Renombra una sesion existente.
-Requiere el token de sesion correspondiente al `session_id` de la ruta.
-Token de otra sesion devuelve 403; sesion inexistente devuelve 404.
+Renames an existing session.
+Requires the session token matching the path `session_id`.
+A token from another session returns 403, and a missing session returns 404.
 
 ```bash
 curl -X PATCH /api/v1/auth/session/{session_id}/name \
@@ -104,27 +104,27 @@ curl -X PATCH /api/v1/auth/session/{session_id}/name \
 
 ### `DELETE /api/v1/auth/session/{session_id}`
 
-Elimina una sesion y su fila de historial.
-Requiere el token de sesion correspondiente; mismas reglas 403/404 que el rename.
-Devuelve `200` con `session_id` y `deleted: true`.
+Deletes a session and its history row.
+Requires the matching session token, with the same 403/404 rules as rename.
+Returns `200` with `session_id` and `deleted: true`.
 
 ### `GET /api/v1/auth/sessions`
 
-Lista solo las sesiones del usuario autenticado.
-Requiere un token de usuario valido; con token de sesion es 403.
+Lists only the sessions owned by the authenticated user.
+Requires a valid user token, and a session token returns 403.
 
-## Configuracion
+## Configuration
 
-La clave de firma vive en `JWT_SECRET_KEY` dentro de `.env.example:10`.
-La expiracion en dias vive en `JWT_ACCESS_TOKEN_EXPIRE_DAYS` dentro de `.env.example:11`.
-Ambas estan tipadas en `src/core/config.py:1`.
-Usa un valor largo y aleatorio de al menos 32 caracteres en produccion.
-Nunca publiques el contenido de `.env:1`.
+The signing key lives in `JWT_SECRET_KEY` inside `.env.example:10`.
+The expiration in days lives in `JWT_ACCESS_TOKEN_EXPIRE_DAYS` inside `.env.example:11`.
+Both are typed in `src/core/config.py:1`.
+Use a long random value of at least 32 characters in production.
+Never publish the contents of `.env:1`.
 
-## Notas de seguridad
+## Security notes
 
-Los passwords se guardan con hash bcrypt y nunca en texto plano.
-Cada JWT incluye un reclamo `jti` para que cada token sea unico.
-El registro y el login tienen rate limits contra fuerza bruta en `src/core/limiter.py:1`.
+Passwords are stored with bcrypt hashes and never in plain text.
+Each JWT includes a `jti` claim so every token is unique.
+Register and login carry rate limits against brute force in `src/core/limiter.py:1`.
 Budgets stay in memory per IP plus route (20 attempts per 60 seconds).
-Los errores usan la misma envelope `{error{code, message}, request_id}` con `X-Request-ID`.
+Errors use the same envelope `{error{code, message}, request_id}` with `X-Request-ID`.

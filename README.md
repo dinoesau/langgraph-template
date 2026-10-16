@@ -21,7 +21,19 @@ S2a persists threads per `thread_id` through a lifespan checkpointer with app ta
 - S2a agent factory in `src/agent/graph.py:1` injects the checkpointer without importing storage.
 - S2a lifespan checkpointer in `src/services/database.py:1` persists threads and reports store readiness on health.
 - S2a app schema in `src/models/:1` with Alembic migration `0001_create_users_sessions`, excluding loop and memory tables.
-- Planned services for LLM fallback and memory plus auth are not implemented yet.
+- S2b memory in `src/services/memory.py:1` recalls per user and writes in background.
+- S2b cache in `src/core/cache.py:1` fronts recall with Valkey plus in-memory TTL fallback.
+- S3 tool loop in `src/agent/graph.py:1` runs chat to tool to chat until no tool calls remain.
+- S3 LLM fallback in `src/services/llm/service.py:1` retries per model and walks `src/services/llm/registry.py:1` in circular order.
+- S4 auth in `src/api/v1/auth.py:1` issues user plus session JWTs with guards in `src/api/deps.py:1`.
+- S5a retrieval in `src/services/retrieval.py:1` serves top-k chunks to `src/agent/rag.py:1` with grounded replies.
+- S5b router in `src/agent/routes.py:1` sends entry requests to RAG, booking, or chat in `src/agent/graph.py:60`.
+- S5c workers in `src/agent/triage.py:1` fan out tickets in parallel and merge one triage card.
+- S5d grader in `src/agent/nodes.py:70` loops generator to grader with a guard at `src/agent/nodes.py:21`.
+- S6 observability in `src/core/tracing.py:1` traces model calls with logs in `src/core/middleware.py:1` and metrics in `src/core/metrics.py:1`.
+- S7a journeys in `tests/integration_tests/test_api_journeys.py:1` cover register to chat over HTTP.
+- S7b evals in `evals/eval_runner.py:1` score stored traces on demand with JSON reports.
+- S8 stack in `docker-compose.yml:1` runs app plus postgres plus Valkey plus Prometheus plus Grafana.
 - Tests in `tests/unit_tests/` cover the echo node and graph without model calls.
 - Tests in `tests/unit_tests/test_persistence.py:1` cover thread resume through the factory with a fake saver.
 - Tests in `tests/unit_tests/test_migrations.py:1` cover the migration boundary on SQLite without Docker.
