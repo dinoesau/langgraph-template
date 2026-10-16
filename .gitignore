@@ -1,0 +1,38 @@
+# Python (fuente: github/gitignore Python.gitignore)
+__pycache__/
+*.py[codz]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# uv (fuente: docs uv + comentario en Python.gitignore)
+# uv.lock NO se ignora a proposito: se commitea para reproducibilidad.
+.venv/
+
+# Entornos y secretos (ws/.env.example:1 es plantilla; langgraph.json usa .env)
+.env
+.env.*
+!.env.example
+
+# Tests y linters
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+htmlcov/
+coverage.xml
+
+# IDE y OS (fuente: plantillas Global JetBrains.gitignore / VisualStudioCode.gitignore / macOS.gitignore)
+.vscode/
+.idea/
+.DS_Store
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Postgres / datos locales (ws/docker-compose.yml:1 usa volumen nombrado; por si hay bind mount)
+data/
+pgdata/
+*.sqlite3
+*.db
