@@ -1,4 +1,4 @@
-# langgraph-base
+# langgraph-template
 
 This starter gives you a minimal production-minded base for LangGraph agents.
 It keeps the deploy contract small so you can grow the codebase step by step.
