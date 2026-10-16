@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from src.agent.graph import graph
+from src.services.database import get_agent_graph
 
 router = APIRouter()
 
@@ -36,8 +37,9 @@ def _resolve_thread_id(thread_id: str | None, request: Request | None = None) ->
     return uuid.uuid4().hex
 
 
-def _invoke_reply(message: str, thread_id: str) -> str:
-    result = graph.invoke(
+def _invoke_reply(message: str, thread_id: str, request: Request | None = None) -> str:
+    active = get_agent_graph(request.app) if request is not None else graph
+    result = active.invoke(
         {"messages": [HumanMessage(content=message)]},
         config={"configurable": {"thread_id": thread_id}},
     )
@@ -52,15 +54,18 @@ def _invoke_reply(message: str, thread_id: str) -> str:
 
 @router.post("/chat", response_model=ChatResponse)
 def chat_invoke(payload: ChatRequest, request: Request) -> ChatResponse:
-    """Invoke the S0 echo graph and return the reply."""
+    """Invoke the loop and return the reply, persisted when the store is ready."""
     thread_id = _resolve_thread_id(payload.thread_id, request)
-    reply = _invoke_reply(payload.message, thread_id)
+    reply = _invoke_reply(payload.message, thread_id, request)
     return ChatResponse(reply=reply, thread_id=thread_id)
 
 
-async def _stream_events(message: str, thread_id: str) -> AsyncIterator[str]:
+async def _stream_events(
+    message: str, thread_id: str, request: Request | None = None
+) -> AsyncIterator[str]:
+    active = get_agent_graph(request.app) if request is not None else graph
     deltas: list[str] = []
-    for update in graph.stream(
+    for update in active.stream(
         {"messages": [HumanMessage(content=message)]},
         config={"configurable": {"thread_id": thread_id}},
     ):
@@ -72,16 +77,16 @@ async def _stream_events(message: str, thread_id: str) -> AsyncIterator[str]:
                     deltas.append(item.content)
     reply = "".join(deltas)
     if not reply:
-        reply = _invoke_reply(message, thread_id)
+        reply = _invoke_reply(message, thread_id, request)
     yield f"data: {json.dumps({'delta': reply, 'thread_id': thread_id})}\n\n"
     yield "data: [DONE]\n\n"
 
 
 @router.post("/chat/stream")
 async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
-    """Stream the S0 echo reply as server-sent events."""
+    """Stream the reply as server-sent events, persisted when the store is ready."""
     thread_id = _resolve_thread_id(payload.thread_id, request)
     return StreamingResponse(
-        _stream_events(payload.message, thread_id),
+        _stream_events(payload.message, thread_id, request),
         media_type="text/event-stream",
     )

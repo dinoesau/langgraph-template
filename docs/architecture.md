@@ -3,7 +3,8 @@
 This doc shows how the starter fits together today and where it grows next.
 S0 ships the echo graph in `src/agent/graph.py:1` with state and a pure chat node.
 S1 adds the HTTP skeleton in `src/api/app.py:1` with typed settings.
-Every other block below is still marked as planned.
+S2a adds persisted threads with a lifespan checkpointer plus app migrations.
+LLM fallback, memory, auth, and observability are still marked as planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -16,15 +17,15 @@ graph TB
     Graph --> ToolCall["tool_call node (planeado S3)"]
     Chat --> LLM["LLM provider (planeado)"]
     ToolCall --> Tools["tools (planeado)"]
-    Graph <--> Ckpt["Checkpointer (planeado)"]
+    Graph <--> Ckpt["Checkpointer (S2a lifespan)"]
     Ckpt --> PG[("PostgreSQL (opcional)")]
-    Graph --> API["HTTP API (planeado)"]
-    Cfg["Config (planeado)"] -.-> Graph
+    Graph --> API["HTTP API (S1 skeleton)"]
+    Cfg["Config (S1 typed)"] -.-> Graph
 ```
 
 Studio is the local client until the HTTP API exists.
 The dev server loads the `agent` graph declared in `langgraph.json:1`.
-Postgres is optional and only stores checkpoints once the checkpointer lands.
+Postgres is optional and persists checkpoints once the lifespan checkpointer connects.
 
 ## Component responsibilities
 
@@ -40,8 +41,8 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
 | HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars |
-| Services | `src/services/:1` | Planeado | Owns LLM fallback, memory, and database access |
-| Checkpointer | AsyncPostgresSaver | Planeado | Persists full state per thread for resume and multi-turn memory |
+| Services | `src/services/:1` | Existe | Owns database access with lifespan checkpointer; LLM fallback and memory stay planned |
+| Checkpointer | AsyncPostgresSaver | Existe | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
 | Tests | `tests/unit_tests/:1` | Existe | Covers the echo node and graph without model calls |
 
@@ -54,7 +55,7 @@ Each step below runs in order for one user message.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
 3. The `chat` node echoes the last human message with no LLM call.
 4. The single-node chain returns directly with no `tool_call` routing yet.
-5. No checkpointer persists state yet, so each invoke is stateless.
+5. The lifespan checkpointer persists state per `thread_id` when Postgres is reachable, else the invoke stays stateless.
 6. The final message returns to Studio.
 
 The S1 HTTP lifecycle runs through `src/api/app.py:1`.
@@ -63,7 +64,7 @@ The S1 HTTP lifecycle runs through `src/api/app.py:1`.
 2. `RequestContextMiddleware` assigns or reuses `X-Request-ID` and binds `thread_id` into the JSON access log to stdout.
 3. The route invokes the echo graph with `graph.invoke` or `graph.stream`.
 4. The reply returns with `thread_id` pass-through plus `X-Request-ID`; stream SSE data events carry `thread_id` and end with `[DONE]`.
-5. `GET /health` returns status ok plus the dependencies stub (`loop: ok`, `store/cache: not_configured`); real checks land with S2/DB. `GET /metrics` returns the stub.
+5. `GET /health` returns status ok plus dependencies (`loop: ok`, `store: ready` or `not_configured` or `unavailable`, `cache: not_configured`). `GET /metrics` returns the stub.
 
 Auth, rate limits, and background memory writes are planned with `src/services/`.
 

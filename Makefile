@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all install dev test tests integration_tests lint lint_package lint_tests format spell_check spell_fix help
+.PHONY: all install dev test tests integration_tests migrate migrate_history lint lint_package lint_tests format spell_check spell_fix help
 
 TEST_FILE ?= tests/unit_tests/
 
@@ -16,6 +16,12 @@ test tests:
 
 integration_tests:
 	uv run pytest tests/integration_tests
+
+migrate:
+	uv run alembic upgrade head
+
+migrate_history:
+	uv run alembic history
 
 lint: lint_package lint_tests
 
@@ -48,6 +54,8 @@ help:
 	@echo "  dev               - inicia LangGraph dev server"
 	@echo "  test / tests      - unit tests en \$$(TEST_FILE) (default: $(TEST_FILE))"
 	@echo "  integration_tests - pytest sobre tests/integration_tests"
+	@echo "  migrate           - aplica migraciones con alembic upgrade head"
+	@echo "  migrate_history   - shows alembic migration history"
 	@echo "  lint              - lint_package + lint_tests (ruff + mypy --strict)"
 	@echo "  lint_package      - ruff + mypy --strict sobre src/"
 	@echo "  lint_tests        - ruff + mypy --strict sobre tests/"

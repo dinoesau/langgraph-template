@@ -1,4 +1,7 @@
 import uuid
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -7,6 +10,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.v1 import router as v1_router
 from src.core.middleware import RequestContextMiddleware
+from src.services.database import database_lifespan, store_status
+
+Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[Any, Any]]
 
 
 def _get_request_id(request: Request) -> str:
@@ -26,19 +32,19 @@ def _error_response(status_code: int, code: str, message: str, request_id: str) 
     )
 
 
-def create_app() -> FastAPI:
-    """Build the S1 API skeleton with health, metrics stub, and chat routes."""
-    app = FastAPI(title="langgraph-template")
+def create_app(lifespan: Lifespan = database_lifespan) -> FastAPI:
+    """Build the API with health, metrics stub, chat routes, and store lifespan."""
+    app = FastAPI(title="langgraph-template", lifespan=lifespan)
     app.add_middleware(RequestContextMiddleware)
     app.include_router(v1_router)
 
     @app.get("/health")
-    def health() -> dict[str, object]:
+    def health(request: Request) -> dict[str, object]:
         return {
             "status": "ok",
             "dependencies": {
                 "loop": "ok",
-                "store": "not_configured",
+                "store": store_status(request.app),
                 "cache": "not_configured",
             },
         }

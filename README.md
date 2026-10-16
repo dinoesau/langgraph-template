@@ -6,6 +6,7 @@ It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
 S0 ships an echo graph and later milestones add tools and services.
 S1 adds the API skeleton with typed config and request logging.
+S2a persists threads per `thread_id` through a lifespan checkpointer with app tables under Alembic.
 
 ## What's included
 
@@ -17,10 +18,16 @@ S1 adds the API skeleton with typed config and request logging.
 - S0 echo loop in `src/agent/graph.py:1` runs START to chat to END with no tools yet.
 - S1 API skeleton in `src/api/app.py:1` serves health with dependencies stub, chat, stream with `thread_id`, and metrics stub.
 - S1 typed settings in `src/core/config.py:1` load env with fail-fast validation.
-- Planned services for LLM fallback, memory, database, and auth are not implemented yet.
+- S2a agent factory in `src/agent/graph.py:1` injects the checkpointer without importing storage.
+- S2a lifespan checkpointer in `src/services/database.py:1` persists threads and reports store readiness on health.
+- S2a app schema in `src/models/:1` with Alembic migration `0001_create_users_sessions`, excluding loop and memory tables.
+- Planned services for LLM fallback and memory plus auth are not implemented yet.
 - Tests in `tests/unit_tests/` cover the echo node and graph without model calls.
+- Tests in `tests/unit_tests/test_persistence.py:1` cover thread resume through the factory with a fake saver.
+- Tests in `tests/unit_tests/test_migrations.py:1` cover the migration boundary on SQLite without Docker.
+- Tests in `tests/integration_tests/test_postgres_persistence.py:1` prove resume across restarts on ephemeral Postgres.
 - Tests in `tests/unit_tests/test_api.py:1` cover the S1 routes without network calls.
-- Tests in `tests/integration_tests/` hold placeholders with real models.
+- Tests in `tests/integration_tests/test_placeholder.py:1` hold placeholders with real models.
 
 ## Quickstart
 
@@ -65,9 +72,12 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 
 ```text
 langgraph-template/
-├── src/agent/        # S0 echo graph, state, nodes
+├── src/agent/        # S0 echo graph, state, nodes, factory
 ├── src/api/          # S1 HTTP skeleton, chat routes
 ├── src/core/         # S1 typed settings and request middleware
+├── src/models/       # S2a app tables: users, sessions
+├── src/services/     # S2a lifespan checkpointer plus store readiness
+├── alembic/          # S2a app migrations, never loop or memory tables
 ├── tests/            # unit echo tests plus integration placeholders
 ├── docs/             # 13 guides: structure, examples, testing, services
 ├── langgraph.json    # deploy contract

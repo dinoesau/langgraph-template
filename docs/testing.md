@@ -17,9 +17,8 @@ Run them with `make test` or a single file with `make test TEST_FILE=tests/unit_
 
 Integration tests talk to real dependencies to prove queries and wiring actually work.
 They live in `tests/integration_tests/` and run via `make integration_tests`.
-Spin up fresh containers just for testing with Testcontainers or a planned override compose file.
-That override file does not exist yet.
-Use a separate test database, never the development one.
+Each run spins an ephemeral postgres container on a random host port with a dedicated test database.
+That container is never the development database and is stopped after the suite.
 Isolate cases by wiping tables, wrapping each test in a rolled-back transaction, or reseeding per test.
 These tests may call real models, so they cost time and money and never run by default.
 

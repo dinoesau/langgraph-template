@@ -32,11 +32,14 @@ Each key maps to `.env.example:1` through `.env.example:4` in order.
 ## Database
 
 Postgres is optional and local dev works without it.
-The graph runs without persistence until the checkpointer lands.
+The lifespan wires `AsyncPostgresSaver` when `POSTGRES_URI` is reachable and degrades to stateless otherwise.
+`POSTGRES_*` are live in `src/core/config.py:1` with the defaults below.
+An empty `POSTGRES_URI` disables persistence and reports `not_configured`.
+`GET /health` reports `ready`, `not_configured`, or `unavailable` in `dependencies.store`.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `POSTGRES_URI` | `postgresql://postgres:postgres@localhost:5432/postgres` | no | Full connection string for local dev |
+| `POSTGRES_URI` | `postgresql://postgres:postgres@localhost:5432/postgres` | no | Full connection string for local dev, empty disables persistence |
 | `POSTGRES_USER` | `postgres` | no | User for the compose service |
 | `POSTGRES_PASSWORD` | `postgres` | no | Password for the compose service |
 | `POSTGRES_DB` | `postgres` | no | Database name for the compose service |
@@ -44,6 +47,7 @@ The graph runs without persistence until the checkpointer lands.
 `POSTGRES_URI` maps to `.env.example:5`.
 The compose values map to `docker-compose.yml:7` through `docker-compose.yml:9`.
 Start the service when you need persistence.
+Apply app migrations with `make migrate` once Postgres is up.
 
 ```bash
 docker compose up -d postgres
@@ -60,6 +64,10 @@ They fail fast with a validation error on bad values.
 | `LOG_LEVEL` | `INFO` | Existe | Controls console verbosity for local runs |
 | `HOST` | `127.0.0.1` | Existe | Bind host for the API server |
 | `PORT` | `8000` | Existe | Bind port for the API server, 1 to 65535 |
+| `POSTGRES_URI` | `postgresql://...` | Existe | Full connection string, empty disables persistence |
+| `POSTGRES_USER` | `postgres` | Existe | User for the compose service |
+| `POSTGRES_PASSWORD` | `postgres` | Existe | Password for the compose service |
+| `POSTGRES_DB` | `postgres` | Existe | Database name for the compose service |
 
 `APP_ENV` maps to `.env.example:6`.
 `LOG_LEVEL` maps to `.env.example:7`.

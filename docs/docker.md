@@ -36,8 +36,8 @@ graph TB
 
 ## Services
 
-Postgres stores app data today.
-It will later store checkpoints and vectors too.
+Postgres stores app data and checkpoints today.
+It will later store vectors too.
 Valkey is planned as a shared cache for memory search.
 Prometheus is planned to scrape `GET /metrics`.
 Grafana is planned to render latency and error dashboards.
@@ -117,18 +117,18 @@ Start with postgres only until metrics land.
 
 ## Migrations
 
-Migrations are planned with Alembic.
-No `alembic/` folder exists yet.
-Migrations will run from the host against compose postgres.
-They will never touch checkpointer tables.
-They will never touch memory vector tables.
+Migrations run with Alembic from the S2a slice.
+The initial migration `0001_create_users_sessions` creates `users` and `sessions`.
+Migrations run from the host against compose postgres.
+They never touch checkpointer tables.
+They never touch memory vector tables.
 See `ws/docs/structure.md:183` for the migration boundary.
 
-Planned flow once Alembic exists:
+Flow with compose postgres:
 
 ```bash
 docker compose up -d
-uv run alembic upgrade head
+make migrate
 ```
 
 ## What exists today
