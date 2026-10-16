@@ -1,4 +1,21 @@
 services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: ${ENV_FILE:-.env.development}
+        required: true
+    environment:
+      POSTGRES_URI: postgresql://postgres:postgres@postgres:5432/postgres
+      VALKEY_HOST: valkey
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+    command: ["uv", "run", "uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
   postgres:
     image: pgvector/pgvector:0.8.0-pg15
     ports:
@@ -9,12 +26,42 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   valkey:
     image: valkey/valkey:8-alpine
     ports:
       - "6379:6379"
     volumes:
       - valkey_data:/data
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
 
 volumes:
   postgres_data:

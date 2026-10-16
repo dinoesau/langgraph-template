@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := all
-.PHONY: all install dev test tests integration_tests migrate migrate_history lint lint_package lint_tests format spell_check spell_fix help
+.PHONY: all install dev test tests integration_tests migrate migrate_history lint lint_package lint_tests format spell_check spell_fix docker-up stack-up stack-down stack-logs help
 
 TEST_FILE ?= tests/unit_tests/
+ENV_FILE ?= .env.development
 
 all: help
 
@@ -47,6 +48,18 @@ spell_check:
 spell_fix:
 	uv run codespell --toml pyproject.toml --write-changes
 
+docker-up:
+	docker compose up -d postgres valkey
+
+stack-up:
+	docker compose --env-file $(ENV_FILE) up -d --build
+
+stack-down:
+	docker compose down
+
+stack-logs:
+	docker compose logs -f
+
 help:
 	@echo "Targets:"
 	@echo "  all               - default, muestra esta ayuda"
@@ -62,3 +75,7 @@ help:
 	@echo "  format            - ruff format + fix de imports (reglas I)"
 	@echo "  spell_check       - codespell (solo reporta)"
 	@echo "  spell_fix         - codespell con --write-changes"
+	@echo "  docker-up         - inicia postgres y valkey con docker compose up -d"
+	@echo "  stack-up          - levanta el stack completo con docker compose --env-file \$$(ENV_FILE) up -d --build"
+	@echo "  stack-down        - detiene el stack con docker compose down"
+	@echo "  stack-logs        - sigue los logs con docker compose logs -f"
