@@ -33,9 +33,14 @@ Done when all three trigger queries route to the right subgraph.
 
 ## 4. Parallel workers
 
+Status: implemented.
 Handles "summarize this ticket" by fanning out with `Send` to `sentiment`, `urgency`, and `category` workers.
+Fan-out lives in `ws/src/agent/triage.py:1` via `fan_out` returning one `Send` per worker with the same ticket text.
 All workers read the same ticket text and write to a shared key in parallel.
+Workers call `llm_service.call` in `ws/src/services/llm/service.py:1` and stay pure plus deterministic.
+The shared `results` key uses `Annotated[list, operator.add]` so parallel writes append without clobber.
 One `aggregator` node merges the three outputs into a single triage card.
+The card carries `ticket_id` plus `sentiment` plus `urgency` plus `category` via `make_triage_graph(checkpointer)`.
 Done when the card contains all three fields plus the ticket id.
 
 ## 5. Evaluator-optimizer
