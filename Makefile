@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all install dev test tests integration_tests migrate migrate_history lint lint_package lint_tests format spell_check spell_fix help
+.PHONY: all install dev test tests integration_tests eval migrate migrate_history lint lint_package lint_tests lint_evals format spell_check spell_fix help
 
 TEST_FILE ?= tests/unit_tests/
 
@@ -17,13 +17,16 @@ test tests:
 integration_tests:
 	uv run pytest tests/integration_tests
 
+eval:
+	uv run python evals/eval_runner.py
+
 migrate:
 	uv run alembic upgrade head
 
 migrate_history:
 	uv run alembic history
 
-lint: lint_package lint_tests
+lint: lint_package lint_tests lint_evals
 
 lint_package:
 	uv run ruff check src/
@@ -37,9 +40,15 @@ lint_tests:
 	uv run ruff check --select I tests/
 	uv run mypy --strict tests/
 
+lint_evals:
+	uv run ruff check evals/
+	uv run ruff format --check evals/
+	uv run ruff check --select I evals/
+	uv run mypy --strict evals/
+
 format:
-	uv run ruff format src/ tests/
-	uv run ruff check --select I --fix src/ tests/
+	uv run ruff format src/ tests/ evals/
+	uv run ruff check --select I --fix src/ tests/ evals/
 
 spell_check:
 	uv run codespell --toml pyproject.toml
@@ -54,11 +63,13 @@ help:
 	@echo "  dev               - inicia LangGraph dev server"
 	@echo "  test / tests      - unit tests en \$$(TEST_FILE) (default: $(TEST_FILE))"
 	@echo "  integration_tests - pytest sobre tests/integration_tests"
+	@echo "  eval              - trajectory evals sobre traces recientes (uv run python evals/eval_runner.py)"
 	@echo "  migrate           - aplica migraciones con alembic upgrade head"
 	@echo "  migrate_history   - shows alembic migration history"
-	@echo "  lint              - lint_package + lint_tests (ruff + mypy --strict)"
+	@echo "  lint              - lint_package + lint_tests + lint_evals (ruff + mypy --strict)"
 	@echo "  lint_package      - ruff + mypy --strict sobre src/"
 	@echo "  lint_tests        - ruff + mypy --strict sobre tests/"
+	@echo "  lint_evals        - ruff + mypy --strict sobre evals/"
 	@echo "  format            - ruff format + fix de imports (reglas I)"
 	@echo "  spell_check       - codespell (solo reporta)"
 	@echo "  spell_fix         - codespell con --write-changes"

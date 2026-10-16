@@ -61,7 +61,7 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 | [LLM Service](docs/llm-service.md) | Planned models, retries, and fallback |
 | [Memory](docs/memory.md) | Planned long-term memory and cache |
 | [Observability](docs/observability.md) | Planned tracing, logging, and metrics |
-| [Evaluation](docs/evaluation.md) | Planned trajectory scoring and eval runs |
+| [Evaluation](docs/evaluation.md) | Trajectory scoring and on-demand eval runs |
 | [Docker](docs/docker.md) | Planned containers and local services |
 | [Testing](docs/testing.md) | Unit, integration, and E2E layers |  
 | [Issue Tracker](docs/agents/issue-tracker.md) | GitHub Issues via `gh`, conventions and wayfinding ops |
