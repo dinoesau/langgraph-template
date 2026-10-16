@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+!.env.development
+!.env.staging
+!.env.production
+.git/
+.venv/
+__pycache__/
+*.py[codz]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+profiles/
+traces.jsonl
