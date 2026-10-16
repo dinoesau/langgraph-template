@@ -16,7 +16,16 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import HumanMessage
 
 from src.api.app import create_app
+from src.core.config import get_settings
+from src.core.security import SESSION_SCOPE, create_token
 from src.services.memory import FakeMemoryStore, MemoryService
+
+
+def _session_headers(user_id: str, thread_id: str) -> dict[str, str]:
+    token, _ = create_token(
+        user_id, SESSION_SCOPE, get_settings().JWT_SECRET_KEY, 7, extra={"sid": thread_id}
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _service(store: FakeMemoryStore | None = None) -> tuple[MemoryService, FakeMemoryStore]:
@@ -71,14 +80,14 @@ def test_remember_failure_is_logged_and_ignored(caplog: pytest.LogCaptureFixture
 def test_chat_injects_recall_as_context_and_keeps_thread_scope() -> None:
     app = create_app()
     store = FakeMemoryStore()
-    store.seed("alice", ["alice prefers morning slots"])
+    store.seed("1", ["alice prefers morning slots"])
     service = MemoryService(store=store, cache={}, ttl_seconds=60, top_k=3)
     app.state.memory_service = service
     client = TestClient(app)
     response = client.post(
         "/api/v1/chat",
         json={"message": "book me a slot", "thread_id": "tid-mem-1"},
-        headers={"X-User-ID": "alice"},
+        headers=_session_headers("1", "tid-mem-1"),
     )
     assert response.status_code == 200
     body = response.json()
@@ -90,7 +99,11 @@ def test_chat_without_memories_keeps_echo() -> None:
     app = create_app()
     app.state.memory_service = MemoryService(store=FakeMemoryStore(), cache={}, ttl_seconds=60)
     client = TestClient(app)
-    response = client.post("/api/v1/chat", json={"message": "hello", "thread_id": "tid-echo-1"})
+    response = client.post(
+        "/api/v1/chat",
+        json={"message": "hello", "thread_id": "tid-echo-1"},
+        headers=_session_headers("1", "tid-echo-1"),
+    )
     assert response.json() == {"reply": "hello", "thread_id": "tid-echo-1"}
 
 
@@ -103,21 +116,32 @@ def test_chat_background_write_does_not_break_reply_even_on_failure() -> None:
     response = client.post(
         "/api/v1/chat",
         json={"message": "hi", "thread_id": "tid-bg-1"},
-        headers={"X-User-ID": "dave"},
+        headers=_session_headers("4", "tid-bg-1"),
     )
     assert response.status_code == 200
     assert response.json()["thread_id"] == "tid-bg-1"
 
 
-def test_chat_anonymous_bypasses_memory() -> None:
+def test_chat_memory_is_scoped_to_token_user() -> None:
     app = create_app()
     store = FakeMemoryStore()
-    store.seed("anonymous", ["must never leak"])
+    store.seed("2", ["bob likes coffee"])
     app.state.memory_service = MemoryService(store=store, cache={}, ttl_seconds=60)
     client = TestClient(app)
+    response = client.post(
+        "/api/v1/chat",
+        json={"message": "what do I drink", "thread_id": "tid-scoped-1"},
+        headers=_session_headers("1", "tid-scoped-1"),
+    )
+    assert response.json() == {"reply": "what do I drink", "thread_id": "tid-scoped-1"}
+
+
+def test_chat_requires_session_token() -> None:
+    app = create_app()
+    app.state.memory_service = MemoryService(store=FakeMemoryStore(), cache={}, ttl_seconds=60)
+    client = TestClient(app)
     response = client.post("/api/v1/chat", json={"message": "hi", "thread_id": "tid-anon-1"})
-    assert response.json() == {"reply": "hi", "thread_id": "tid-anon-1"}
-    assert store.search_calls == 0
+    assert response.status_code == 401
 
 
 def test_loop_never_imports_memory_storage() -> None:

@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage
 from src.agent.graph import graph
 from src.api.app import create_app
 from src.core.config import get_settings
+from src.core.security import SESSION_SCOPE, create_token
 from src.services.database import (
     STORE_NOT_CONFIGURED,
     STORE_UNAVAILABLE,
@@ -15,6 +16,13 @@ from src.services.database import (
     get_agent_graph,
     store_status,
 )
+
+
+def _session_headers(thread_id: str) -> dict[str, str]:
+    token, _ = create_token(
+        "1", SESSION_SCOPE, get_settings().JWT_SECRET_KEY, 7, extra={"sid": thread_id}
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 
 def test_health_reports_store_not_configured_by_default() -> None:
@@ -49,7 +57,11 @@ def test_routes_use_lifespan_graph_when_present() -> None:
     app = create_app()
     app.state.agent_graph = _StubGraph()
     client = TestClient(app)
-    response = client.post("/api/v1/chat", json={"message": "hi", "thread_id": "tid-stub"})
+    response = client.post(
+        "/api/v1/chat",
+        json={"message": "hi", "thread_id": "tid-stub"},
+        headers=_session_headers("tid-stub"),
+    )
     assert response.status_code == 200
     assert response.json() == {"reply": "stub-reply", "thread_id": "tid-stub"}
     assert get_agent_graph(app) is app.state.agent_graph
@@ -60,7 +72,11 @@ def test_routes_fall_back_to_stateless_graph() -> None:
     app = create_app()
     assert get_agent_graph(app) is graph
     client = TestClient(app)
-    response = client.post("/api/v1/chat", json={"message": "hi", "thread_id": "tid-x"})
+    response = client.post(
+        "/api/v1/chat",
+        json={"message": "hi", "thread_id": "tid-x"},
+        headers=_session_headers("tid-x"),
+    )
     assert response.json() == {"reply": "hi", "thread_id": "tid-x"}
 
 
