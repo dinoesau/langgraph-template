@@ -195,13 +195,14 @@ def test_http_thread_resumes_across_app_restart(
             assert first.post(
                 "/api/v1/chat", json={"message": "hello"}, headers=headers
             ).json() == {"reply": "hello", "thread_id": thread}
-            assert first.post(
-                "/api/v1/chat", json={"message": "again"}, headers=headers
-            ).json() == {"reply": "again", "thread_id": thread}
+            second_reply = first.post("/api/v1/chat", json={"message": "again"}, headers=headers)
+            assert second_reply.json()["thread_id"] == thread
+            assert "again" in second_reply.json()["reply"]
         with TestClient(create_app()) as second:
             assert second.get("/health").json()["dependencies"]["store"] == "ready"
             reply = second.post("/api/v1/chat", json={"message": "third"}, headers=headers)
-            assert reply.json() == {"reply": "third", "thread_id": thread}
+            assert reply.json()["thread_id"] == thread
+            assert "third" in reply.json()["reply"]
         assert asyncio.run(_message_count(thread)) == 6
     finally:
         monkeypatch.undo()

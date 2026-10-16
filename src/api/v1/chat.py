@@ -1,9 +1,9 @@
 import json
-import uuid
+import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
@@ -12,6 +12,9 @@ from src.agent.graph import graph
 from src.api.deps import require_session_claims, session_id_from
 from src.core.security import TokenClaims
 from src.services.database import get_agent_graph
+from src.services.memory import get_memory_service, remember_in_background
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,16 +33,6 @@ class ChatResponse(BaseModel):
     thread_id: str
 
 
-def _resolve_thread_id(thread_id: str | None, request: Request | None = None) -> str:
-    if thread_id:
-        return thread_id
-    if request is not None:
-        state_id = getattr(request.state, "thread_id", None)
-        if isinstance(state_id, str) and state_id:
-            return state_id
-    return uuid.uuid4().hex
-
-
 def _resolve_session_thread(thread_id: str | None, claims: TokenClaims) -> str:
     """Bind the chat thread to the session token; reject body mismatches."""
     session_id = session_id_from(claims)
@@ -48,10 +41,37 @@ def _resolve_session_thread(thread_id: str | None, claims: TokenClaims) -> str:
     return session_id
 
 
-def _invoke_reply(message: str, thread_id: str, request: Request | None = None) -> str:
+def _recall_context(user_id: str, message: str, request: Request | None = None) -> str:
+    # Identity comes from the session token, so recall is always scoped to the
+    # token owner and memories can never leak across users.
+    if request is None or not user_id:
+        return ""
+    try:
+        service = get_memory_service(request.app)
+        if service is None:
+            return ""
+        return service.recall(user_id, message)
+    except Exception:
+        logger.warning("memory recall failed, replying without context", exc_info=True)
+        return ""
+
+
+def _with_memory_context(message: str, context: str) -> str:
+    if not context.strip():
+        return message
+    return f"Relevant memories:\n{context}\n\nUser: {message}"
+
+
+def _invoke_reply(
+    message: str,
+    thread_id: str,
+    request: Request | None = None,
+    user_id: str = "",
+) -> str:
     active = get_agent_graph(request.app) if request is not None else graph
+    context = _recall_context(user_id, message, request)
     result = active.invoke(
-        {"messages": [HumanMessage(content=message)]},
+        {"messages": [HumanMessage(content=_with_memory_context(message, context))]},
         config={"configurable": {"thread_id": thread_id}},
     )
     messages = result.get("messages", [])
@@ -67,21 +87,35 @@ def _invoke_reply(message: str, thread_id: str, request: Request | None = None) 
 def chat_invoke(
     payload: ChatRequest,
     request: Request,
+    background: BackgroundTasks,
     claims: Annotated[TokenClaims, Depends(require_session_claims)],
 ) -> ChatResponse:
     """Invoke the loop and return the reply, persisted when the store is ready."""
     thread_id = _resolve_session_thread(payload.thread_id, claims)
-    reply = _invoke_reply(payload.message, thread_id, request)
+    user_id = claims["sub"]
+    reply = _invoke_reply(payload.message, thread_id, request, user_id)
+    background.add_task(
+        remember_in_background,
+        get_memory_service(request.app),
+        user_id,
+        payload.message,
+        reply,
+    )
     return ChatResponse(reply=reply, thread_id=thread_id)
 
 
 async def _stream_events(
-    message: str, thread_id: str, request: Request | None = None
+    message: str,
+    thread_id: str,
+    request: Request | None = None,
+    user_id: str = "",
 ) -> AsyncIterator[str]:
     active = get_agent_graph(request.app) if request is not None else graph
+    context = _recall_context(user_id, message, request)
+    effective = _with_memory_context(message, context)
     deltas: list[str] = []
     for update in active.stream(
-        {"messages": [HumanMessage(content=message)]},
+        {"messages": [HumanMessage(content=effective)]},
         config={"configurable": {"thread_id": thread_id}},
     ):
         for node_update in update.values():
@@ -92,7 +126,9 @@ async def _stream_events(
                     deltas.append(item.content)
     reply = "".join(deltas)
     if not reply:
-        reply = _invoke_reply(message, thread_id, request)
+        reply = _invoke_reply(message, thread_id, request, user_id)
+    if request is not None and user_id:
+        remember_in_background(get_memory_service(request.app), user_id, message, reply)
     yield f"data: {json.dumps({'delta': reply, 'thread_id': thread_id})}\n\n"
     yield "data: [DONE]\n\n"
 
@@ -105,7 +141,8 @@ async def chat_stream(
 ) -> StreamingResponse:
     """Stream the reply as server-sent events, persisted when the store is ready."""
     thread_id = _resolve_session_thread(payload.thread_id, claims)
+    user_id = claims["sub"]
     return StreamingResponse(
-        _stream_events(payload.message, thread_id, request),
+        _stream_events(payload.message, thread_id, request, user_id),
         media_type="text/event-stream",
     )

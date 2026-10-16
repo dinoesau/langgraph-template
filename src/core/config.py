@@ -23,6 +23,13 @@ class Settings(BaseSettings):
         min_length=32,
     )
     JWT_ACCESS_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, le=365)
+    CACHE_TTL_SECONDS: int = Field(default=60, ge=1, le=3600)
+    VALKEY_HOST: str = ""
+    VALKEY_PORT: int = Field(default=6379, ge=1, le=65535)
+    LONG_TERM_MEMORY_COLLECTION_NAME: str = Field(default="longterm_memory", min_length=1)
+    LONG_TERM_MEMORY_EMBEDDER_MODEL: str = ""
+    LONG_TERM_MEMORY_MODEL: str = ""
+    LONG_TERM_MEMORY_TOP_K: int = Field(default=3, ge=1, le=20)
 
 
 @lru_cache
