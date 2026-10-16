@@ -74,6 +74,25 @@ They fail fast with a validation error on bad values.
 `HOST` maps to `.env.example:8`.
 `PORT` maps to `.env.example:9`.
 
+## Memory and cache
+
+These variables are live in `src/core/config.py:1`.
+They control per-user recall, the shared cache front, and background writes.
+See `docs/memory.md:1` for the full memory guide.
+
+| Variable | Default | Status | Description |
+| --- | --- | --- | --- |
+| `CACHE_TTL_SECONDS` | `60` | Existe | TTL for cached memory search, 1 to 3600 seconds |
+| `VALKEY_HOST` | empty | Existe | Enables the shared cache once set, empty keeps the in-memory fallback |
+| `VALKEY_PORT` | `6379` | Existe | Port for the shared cache service |
+| `LONG_TERM_MEMORY_COLLECTION_NAME` | `longterm_memory` | Existe | Vector collection name for the memory store |
+| `LONG_TERM_MEMORY_EMBEDDER_MODEL` | empty | Existe | Reserved embedder name, embeddings are an offline placeholder today |
+| `LONG_TERM_MEMORY_MODEL` | empty | Existe | Reserved extraction model name |
+| `LONG_TERM_MEMORY_TOP_K` | `3` | Existe | Memories injected as context per turn, 1 to 20 |
+
+Requests without an identity bypass memory.
+Send `user_id` in the chat payload or `X-User-ID` as a header to enable recall.
+
 ## Planned settings
 
 These names are reserved for `src/core/config.py:1` and have no effect today.
@@ -86,7 +105,6 @@ Do not rely on them until each module ships.
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
 | `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |
 | `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
-| `VALKEY_HOST` | planeado | planeado | Enables shared cache once the cache service exists |
 
 ## Validation
 

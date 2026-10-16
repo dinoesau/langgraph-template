@@ -1,20 +1,18 @@
 # Memory
 
-Long term memory is planned.
-It is not implemented yet.
-This guide describes the target design for this starter.
+Long term memory is live in S2b.
+Per-user recall runs on every chat turn with a shared cache front.
+Writes run in background after the reply and never slow chat.
 
 ## Status
 
 Short term state lives in the graph checkpointer.
-`GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
+`GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages`.
 Graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `ws/docs/structure.md:132`.
-See `ws/src/agent/graph.py:1` for the planned wiring point.
-See `ws/docs/structure.md:172` for the `ws/src/services/memory.py:1` role.
-See `ws/docs/structure.md:165` for the `ws/src/core/cache.py:1` role.
-Semantic memory and cache are both marked as planned.
-Today only `ws/src/agent/__init__.py:1` exists in code.
-Today `ws/docker-compose.yml:1` only starts postgres.
+Semantic recall lives in `ws/src/services/memory.py:1` as `MemoryService` with `recall` plus `remember`.
+The cache front lives in `ws/src/core/cache.py:1` as `InMemoryCache` plus `ValkeyCache`.
+Chat routes in `ws/src/api/v1/chat.py:1` inject recall as plain context and schedule writes on `BackgroundTasks`.
+`ws/docker-compose.yml:1` starts pgvector postgres plus Valkey.
 
 ## Overview
 
@@ -54,23 +52,23 @@ sequenceDiagram
 
 ## Cache layer
 
-Memory search results will be cached for a short time.
-The cache will avoid repeated vector queries for similar questions.
-With Valkey the cache will be shared across app instances.
-Without Valkey the code will fall back to an in-memory TTL cache.
-The fallback will suit a single instance for local work.
-Cache keys will look like `memory:{user_id}:{query_hash}`.
-TTL will come from `CACHE_TTL_SECONDS` with a default of 60 seconds.
-Only successful and non-empty results will be cached.
-Errors will never be cached.
+Memory search results are cached for a short time.
+The cache avoids repeated vector queries for similar questions.
+With `VALKEY_HOST` set the cache is shared across app instances through `ValkeyCache`.
+Without `VALKEY_HOST` the code falls back to `InMemoryCache`.
+The fallback suits a single instance for local work.
+Cache keys look like `memory:{user_id}:{query_hash}`.
+TTL comes from `CACHE_TTL_SECONDS` with a default of 60 seconds.
+Only successful and non-empty results are cached.
+Errors are never cached.
 
 ## Memory updates
 
-Memory writes will run in the background after the response.
-The response will return immediately without waiting for storage.
-Memory work will not slow down the chat path.
-Failures in background writes will be logged and ignored.
-The chat response will stay correct even when memory fails.
+Memory writes run in the background after the response.
+The response returns immediately without waiting for storage.
+Memory work does not slow down the chat path.
+Failures in background writes are logged and ignored.
+The chat response stays correct even when memory fails.
 
 ## Configuration
 
@@ -79,10 +77,12 @@ The chat response will stay correct even when memory fails.
 | LONG_TERM_MEMORY_COLLECTION_NAME | longterm_memory | Vector collection name |
 | LONG_TERM_MEMORY_MODEL | empty | LLM used to extract memories |
 | LONG_TERM_MEMORY_EMBEDDER_MODEL | empty | Embedding model for search |
+| LONG_TERM_MEMORY_TOP_K | 3 | Memories injected per turn |
 | CACHE_TTL_SECONDS | 60 | Memory search cache TTL |
 | VALKEY_HOST | empty | Set to enable shared cache |
+| VALKEY_PORT | 6379 | Shared cache port |
 
-Values above are planned.
+Values above are live in `ws/src/core/config.py:1`.
 See `ws/.env.example:1` for the current env template.
 `POSTGRES_URI` in `ws/.env.example:5` will back both checkpoints and vectors.
 
@@ -98,23 +98,26 @@ Tools live in `ws/src/agent/tools/booking.py:1` as `get_availability`, `book_app
 
 ## Per-user isolation
 
-Each user namespace will be isolated by `user_id`.
-Search will only return vectors for the requesting user.
-Users will never see memories from other users.
-Session scope will still come from `thread_id` in the checkpointer.
+Each user namespace is isolated by `user_id`.
+Search only returns vectors for the requesting user.
+Users never see memories from other users.
+Requests without an identity (`anonymous`, no `user_id` and no `X-User-ID`) bypass memory entirely.
+That bypass keeps one shared anonymous id from leaking memories across users.
+Session scope still comes from `thread_id` in the checkpointer.
 
 ## What exists today
 
-`ws/docker-compose.yml:1` starts postgres on port 5432.
-It has no pgvector extension yet.
-It has no Valkey service yet.
-`ws/pyproject.toml:1` has no vector or memory dependency yet.
-`ws/langgraph.json:1` only maps the graph and env file.
+`ws/docker-compose.yml:1` starts pgvector postgres on port 5432 plus Valkey on port 6379.
+The postgres image carries the `vector` extension and the lifespan runs `CREATE EXTENSION IF NOT EXISTS vector`.
+Memory rows live in the `memory_embeddings` table owned by the memory layer.
+Alembic never touches that table per `ws/alembic/env.py:1`.
+`ws/pyproject.toml:1` includes `redis` for the shared cache client.
+Embeddings are a deterministic offline placeholder (`hash_embedding`) until a real embedder model lands.
+The requesting user comes from the `user_id` payload field or the `X-User-ID` header.
+Auth in S4 will supply the real user id and memory keeps the same per-user contract.
 
 ## Next steps
 
-Add `ws/src/services/memory.py:1` with search and add functions.
-Add `ws/src/core/cache.py:1` with Valkey plus in-memory fallback.
-Extend `ws/docker-compose.yml:1` with pgvector and Valkey.
-Add env vars to `ws/.env.example:1` for collection and TTL.
-Wire memory search into the chat node in `ws/src/agent/graph.py:1`.
+Point the embedder at `LONG_TERM_MEMORY_EMBEDDER_MODEL` once a provider is chosen.
+Feed auth user ids into recall once S4 lands.
+Tune `LONG_TERM_MEMORY_TOP_K` once grounded answers are measured.
