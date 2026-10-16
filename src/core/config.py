@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "postgres"
+    JWT_SECRET_KEY: str = Field(
+        default="dev-only-secret-key-change-in-production-0123456789",
+        min_length=32,
+    )
+    JWT_ACCESS_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, le=365)
 
 
 @lru_cache

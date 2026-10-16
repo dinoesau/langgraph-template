@@ -51,6 +51,6 @@ def test_downgrade_removes_app_tables(tmp_path) -> None:  # type: ignore[no-unty
     db_file = tmp_path / "migration-rollback.db"
     cfg = _sqlite_config(str(db_file))
     command.upgrade(cfg, "head")
-    command.downgrade(cfg, "-1")
+    command.downgrade(cfg, "base")
     tables = set(inspect(create_engine(f"sqlite:///{db_file}")).get_table_names())
     assert tables.isdisjoint({"users", "sessions"})

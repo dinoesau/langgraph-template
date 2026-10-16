@@ -1,13 +1,16 @@
 import json
 import uuid
 from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, Field
 
 from src.agent.graph import graph
+from src.api.deps import require_session_claims, session_id_from
+from src.core.security import TokenClaims
 from src.services.database import get_agent_graph
 
 router = APIRouter()
@@ -37,6 +40,14 @@ def _resolve_thread_id(thread_id: str | None, request: Request | None = None) ->
     return uuid.uuid4().hex
 
 
+def _resolve_session_thread(thread_id: str | None, claims: TokenClaims) -> str:
+    """Bind the chat thread to the session token; reject body mismatches."""
+    session_id = session_id_from(claims)
+    if thread_id is not None and thread_id != session_id:
+        raise HTTPException(status_code=403, detail="Thread does not match the session token.")
+    return session_id
+
+
 def _invoke_reply(message: str, thread_id: str, request: Request | None = None) -> str:
     active = get_agent_graph(request.app) if request is not None else graph
     result = active.invoke(
@@ -53,9 +64,13 @@ def _invoke_reply(message: str, thread_id: str, request: Request | None = None) 
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_invoke(payload: ChatRequest, request: Request) -> ChatResponse:
+def chat_invoke(
+    payload: ChatRequest,
+    request: Request,
+    claims: Annotated[TokenClaims, Depends(require_session_claims)],
+) -> ChatResponse:
     """Invoke the loop and return the reply, persisted when the store is ready."""
-    thread_id = _resolve_thread_id(payload.thread_id, request)
+    thread_id = _resolve_session_thread(payload.thread_id, claims)
     reply = _invoke_reply(payload.message, thread_id, request)
     return ChatResponse(reply=reply, thread_id=thread_id)
 
@@ -83,9 +98,13 @@ async def _stream_events(
 
 
 @router.post("/chat/stream")
-async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
+async def chat_stream(
+    payload: ChatRequest,
+    request: Request,
+    claims: Annotated[TokenClaims, Depends(require_session_claims)],
+) -> StreamingResponse:
     """Stream the reply as server-sent events, persisted when the store is ready."""
-    thread_id = _resolve_thread_id(payload.thread_id, request)
+    thread_id = _resolve_session_thread(payload.thread_id, claims)
     return StreamingResponse(
         _stream_events(payload.message, thread_id, request),
         media_type="text/event-stream",

@@ -68,11 +68,15 @@ They fail fast with a validation error on bad values.
 | `POSTGRES_USER` | `postgres` | Existe | User for the compose service |
 | `POSTGRES_PASSWORD` | `postgres` | Existe | Password for the compose service |
 | `POSTGRES_DB` | `postgres` | Existe | Database name for the compose service |
+| `JWT_SECRET_KEY` | dev placeholder | Existe | Signs auth tokens, 32+ chars, rotate in production |
+| `JWT_ACCESS_TOKEN_EXPIRE_DAYS` | `7` | Existe | Days until user and session tokens expire, 1 to 365 |
 
 `APP_ENV` maps to `.env.example:6`.
 `LOG_LEVEL` maps to `.env.example:7`.
 `HOST` maps to `.env.example:8`.
 `PORT` maps to `.env.example:9`.
+`JWT_SECRET_KEY` maps to `.env.example:10`.
+`JWT_ACCESS_TOKEN_EXPIRE_DAYS` maps to `.env.example:11`.
 
 ## Planned settings
 
@@ -84,7 +88,6 @@ Do not rely on them until each module ships.
 | `DEFAULT_LLM_MODEL` | planeado | planeado | Starting model for the chat node |
 | `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
-| `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |
 | `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
 | `VALKEY_HOST` | planeado | planeado | Enables shared cache once the cache service exists |
 
