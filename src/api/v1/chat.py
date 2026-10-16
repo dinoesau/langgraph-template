@@ -37,9 +37,9 @@ def _resolve_thread_id(thread_id: str | None, request: Request | None = None) ->
     return uuid.uuid4().hex
 
 
-def _invoke_reply(message: str, thread_id: str, request: Request | None = None) -> str:
+async def _invoke_reply(message: str, thread_id: str, request: Request | None = None) -> str:
     active = get_agent_graph(request.app) if request is not None else graph
-    result = active.invoke(
+    result = await active.ainvoke(
         {"messages": [HumanMessage(content=message)]},
         config={"configurable": {"thread_id": thread_id}},
     )
@@ -53,10 +53,10 @@ def _invoke_reply(message: str, thread_id: str, request: Request | None = None) 
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_invoke(payload: ChatRequest, request: Request) -> ChatResponse:
+async def chat_invoke(payload: ChatRequest, request: Request) -> ChatResponse:
     """Invoke the loop and return the reply, persisted when the store is ready."""
     thread_id = _resolve_thread_id(payload.thread_id, request)
-    reply = _invoke_reply(payload.message, thread_id, request)
+    reply = await _invoke_reply(payload.message, thread_id, request)
     return ChatResponse(reply=reply, thread_id=thread_id)
 
 
@@ -65,7 +65,7 @@ async def _stream_events(
 ) -> AsyncIterator[str]:
     active = get_agent_graph(request.app) if request is not None else graph
     deltas: list[str] = []
-    for update in active.stream(
+    async for update in active.astream(
         {"messages": [HumanMessage(content=message)]},
         config={"configurable": {"thread_id": thread_id}},
     ):
@@ -77,7 +77,7 @@ async def _stream_events(
                     deltas.append(item.content)
     reply = "".join(deltas)
     if not reply:
-        reply = _invoke_reply(message, thread_id, request)
+        reply = await _invoke_reply(message, thread_id, request)
     yield f"data: {json.dumps({'delta': reply, 'thread_id': thread_id})}\n\n"
     yield "data: [DONE]\n\n"
 

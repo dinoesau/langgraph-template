@@ -4,20 +4,25 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from src.agent.nodes import chat
+from src.agent.nodes import chat, tool_call
+from src.agent.routes import route_after_chat
 from src.agent.state import GraphState
 
-# S0 keeps a single-node START -> chat -> END chain.
-# The planned two-node chat <-> tool_call loop collapses to this echo until S3,
-# when tools and routing land. Persistence arrives only through the factory below:
+# S3 runs the two-node chat <-> tool_call ReAct loop.
+# The loop ends when the LLM reply carries no tool calls.
+# Persistence arrives only through the factory below:
 # the loop module never imports storage, it only accepts an injected checkpointer.
 
 
 def _build() -> StateGraph[GraphState, Any, Any, Any]:
     builder = StateGraph(GraphState)
     builder.add_node("chat", chat)
+    builder.add_node("tool_call", tool_call)
     builder.add_edge(START, "chat")
-    builder.add_edge("chat", END)
+    builder.add_conditional_edges(
+        "chat", route_after_chat, {"tool_call": "tool_call", "__end__": END}
+    )
+    builder.add_edge("tool_call", "chat")
     return builder
 
 

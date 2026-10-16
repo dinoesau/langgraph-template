@@ -68,6 +68,9 @@ They fail fast with a validation error on bad values.
 | `POSTGRES_USER` | `postgres` | Existe | User for the compose service |
 | `POSTGRES_PASSWORD` | `postgres` | Existe | Password for the compose service |
 | `POSTGRES_DB` | `postgres` | Existe | Database name for the compose service |
+| `DEFAULT_LLM_MODEL` | `default-openai` | Existe | Starting model for the chat node, sets the fallback offset |
+| `MAX_LLM_CALL_RETRIES` | `3` | Existe | Attempts per model on retryable errors, 1 to 10 |
+| `LLM_TOTAL_TIMEOUT` | `60.0` | Existe | Budget in seconds for retries plus fallback, 1 to 600 |
 
 `APP_ENV` maps to `.env.example:6`.
 `LOG_LEVEL` maps to `.env.example:7`.
@@ -81,7 +84,6 @@ Do not rely on them until each module ships.
 
 | Variable | Default | Status | Description |
 | --- | --- | --- | --- |
-| `DEFAULT_LLM_MODEL` | planeado | planeado | Starting model for the chat node |
 | `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
 | `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
 | `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |

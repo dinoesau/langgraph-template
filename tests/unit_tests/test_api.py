@@ -3,13 +3,31 @@ import logging
 
 import pytest
 from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import ValidationError
 
 from src.api.app import create_app
 from src.core.config import Settings, get_settings
+from src.services.llm.service import llm_service
 
 app = create_app()
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _fake_llm_echo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep HTTP tests hermetic: the loop answers through a fake LLM echo."""
+
+    async def _echo(messages: object, **kwargs: object) -> AIMessage:
+        text = ""
+        assert isinstance(messages, list)
+        for message in reversed(messages):
+            if isinstance(message, HumanMessage):
+                text = message.content if isinstance(message.content, str) else ""
+                break
+        return AIMessage(content=text)
+
+    monkeypatch.setattr(llm_service, "call", _echo)
 
 
 def test_health_ok_and_request_id() -> None:
