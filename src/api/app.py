@@ -10,7 +10,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.v1 import router as v1_router
 from src.core.middleware import RequestContextMiddleware
-from src.services.database import database_lifespan, store_status
+from src.services.database import cache_status, database_lifespan, store_status
 
 Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[Any, Any]]
 
@@ -45,7 +45,7 @@ def create_app(lifespan: Lifespan = database_lifespan) -> FastAPI:
             "dependencies": {
                 "loop": "ok",
                 "store": store_status(request.app),
-                "cache": "not_configured",
+                "cache": cache_status(request.app),
             },
         }
 

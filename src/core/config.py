@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "postgres"
+    CACHE_TTL_SECONDS: int = Field(default=60, ge=1, le=3600)
+    VALKEY_HOST: str = ""
+    VALKEY_PORT: int = Field(default=6379, ge=1, le=65535)
+    LONG_TERM_MEMORY_COLLECTION_NAME: str = Field(default="longterm_memory", min_length=1)
+    LONG_TERM_MEMORY_EMBEDDER_MODEL: str = ""
+    LONG_TERM_MEMORY_MODEL: str = ""
+    LONG_TERM_MEMORY_TOP_K: int = Field(default=3, ge=1, le=20)
 
 
 @lru_cache
