@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(min_length=1, max_length=4000)
     thread_id: str | None = Field(default=None, max_length=64)
+    user_id: str | None = Field(default=None, max_length=64)
 
 
 class ChatResponse(BaseModel):
@@ -62,7 +63,7 @@ def _with_memory_context(message: str, context: str) -> str:
     return f"Relevant memories:\n{context}\n\nUser: {message}"
 
 
-def _invoke_reply(
+async def _invoke_reply(
     message: str,
     thread_id: str,
     request: Request | None = None,
@@ -70,7 +71,7 @@ def _invoke_reply(
 ) -> str:
     active = get_agent_graph(request.app) if request is not None else graph
     context = _recall_context(user_id, message, request)
-    result = active.invoke(
+    result = await active.ainvoke(
         {"messages": [HumanMessage(content=_with_memory_context(message, context))]},
         config={"configurable": {"thread_id": thread_id}},
     )
@@ -84,7 +85,7 @@ def _invoke_reply(
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_invoke(
+async def chat_invoke(
     payload: ChatRequest,
     request: Request,
     background: BackgroundTasks,
@@ -93,7 +94,7 @@ def chat_invoke(
     """Invoke the loop and return the reply, persisted when the store is ready."""
     thread_id = _resolve_session_thread(payload.thread_id, claims)
     user_id = claims["sub"]
-    reply = _invoke_reply(payload.message, thread_id, request, user_id)
+    reply = await _invoke_reply(payload.message, thread_id, request, user_id)
     background.add_task(
         remember_in_background,
         get_memory_service(request.app),
@@ -114,7 +115,7 @@ async def _stream_events(
     context = _recall_context(user_id, message, request)
     effective = _with_memory_context(message, context)
     deltas: list[str] = []
-    for update in active.stream(
+    async for update in active.astream(
         {"messages": [HumanMessage(content=effective)]},
         config={"configurable": {"thread_id": thread_id}},
     ):
@@ -126,7 +127,7 @@ async def _stream_events(
                     deltas.append(item.content)
     reply = "".join(deltas)
     if not reply:
-        reply = _invoke_reply(message, thread_id, request, user_id)
+        reply = await _invoke_reply(message, thread_id, request, user_id)
     if request is not None and user_id:
         remember_in_background(get_memory_service(request.app), user_id, message, reply)
     yield f"data: {json.dumps({'delta': reply, 'thread_id': thread_id})}\n\n"

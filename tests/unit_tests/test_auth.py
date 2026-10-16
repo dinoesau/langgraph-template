@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
+from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session as OrmSession
 from sqlalchemy.orm import sessionmaker
@@ -18,8 +19,25 @@ import src.api.v1.auth as auth_module
 from src.api.app import create_app
 from src.core.limiter import RateLimiter, auth_rate_limiter
 from src.models import Base
+from src.services.llm.service import llm_service
 
 PASSWORD = "ChangeMe123!"
+
+
+@pytest.fixture(autouse=True)
+def _fake_llm_echo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep auth route tests hermetic: the loop answers through a fake echo."""
+
+    async def _echo(messages: object, **kwargs: object) -> AIMessage:
+        text = ""
+        assert isinstance(messages, list)
+        for message in reversed(messages):
+            if isinstance(message, HumanMessage):
+                text = message.content if isinstance(message.content, str) else ""
+                break
+        return AIMessage(content=text)
+
+    monkeypatch.setattr(llm_service, "call", _echo)
 
 
 @pytest.fixture()

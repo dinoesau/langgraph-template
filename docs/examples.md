@@ -8,6 +8,7 @@ Extra specialists join as subgraph nodes sharing `GraphState` in `ws/src/agent/s
 
 ## 1. ReAct tool agent
 
+Status: implemented.
 Answers "book me tomorrow 10am" by looping `chat -> tool_call -> chat`.
 Tools live in `ws/src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
 The `chat` node binds the `tools` list with `bind_tools`.

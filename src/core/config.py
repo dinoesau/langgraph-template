@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "postgres"
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    GOOGLE_API_KEY: str = ""
+    DEFAULT_LLM_MODEL: str = "default-openai"
+    MAX_LLM_CALL_RETRIES: int = Field(default=3, ge=1, le=10)
+    LLM_TOTAL_TIMEOUT: float = Field(default=60.0, ge=1.0, le=600.0)
     JWT_SECRET_KEY: str = Field(
         default="dev-only-secret-key-change-in-production-0123456789",
         min_length=32,

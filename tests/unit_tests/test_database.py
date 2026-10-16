@@ -1,9 +1,11 @@
 import asyncio
+from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from src.agent.graph import graph
 from src.api.app import create_app
@@ -16,6 +18,23 @@ from src.services.database import (
     get_agent_graph,
     store_status,
 )
+from src.services.llm.service import llm_service
+
+
+@pytest.fixture(autouse=True)
+def _fake_llm_echo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep route fallback tests hermetic: the loop answers through a fake echo."""
+
+    async def _echo(messages: Any, **kwargs: Any) -> AIMessage:
+        text = ""
+        assert isinstance(messages, list)
+        for message in reversed(messages):
+            if isinstance(message, HumanMessage):
+                text = message.content if isinstance(message.content, str) else ""
+                break
+        return AIMessage(content=text)
+
+    monkeypatch.setattr(llm_service, "call", _echo)
 
 
 def _session_headers(thread_id: str) -> dict[str, str]:
@@ -47,12 +66,13 @@ def test_routes_use_lifespan_graph_when_present() -> None:
     seen: list[tuple[object, object]] = []
 
     class _StubGraph:
-        def invoke(self, payload: object, config: object) -> object:
+        async def ainvoke(self, payload: object, config: object) -> object:
             seen.append((payload, config))
             return {"messages": [HumanMessage(content="stub-reply")]}
 
-        def stream(self, payload: object, config: object) -> object:
-            raise AssertionError("stream must not be called by the invoke route")
+        async def astream(self, payload: object, config: object) -> AsyncIterator[Any]:
+            raise AssertionError("astream must not be called by the invoke route")
+            yield  # pragma: no cover - keeps this an async generator
 
     app = create_app()
     app.state.agent_graph = _StubGraph()
