@@ -35,17 +35,25 @@ Done when all three trigger queries route to the right subgraph.
 
 ## 4. Parallel workers
 
+Status: implemented.
 Handles "summarize this ticket" by fanning out with `Send` to `sentiment`, `urgency`, and `category` workers.
+Fan-out lives in `ws/src/agent/triage.py:1` via `fan_out` returning one `Send` per worker with the same ticket text.
 All workers read the same ticket text and write to a shared key in parallel.
+Workers call `llm_service.call` in `ws/src/services/llm/service.py:1` and stay pure plus deterministic.
+The shared `results` key uses `Annotated[list, operator.add]` so parallel writes append without clobber.
 One `aggregator` node merges the three outputs into a single triage card.
+The card carries `ticket_id` plus `sentiment` plus `urgency` plus `category` via `make_triage_graph(checkpointer)`.
 Done when the card contains all three fields plus the ticket id.
 
 ## 5. Evaluator-optimizer
 
+Status: implemented.
 A `generator` node drafts the reply and a `grader` node checks it via `llm_service.call` with `response_format`.
 The service applies `with_structured_output` internally per `ws/src/services/llm/service.py:1`.
+The verdict shape is `GradeDecision` in `ws/src/agent/nodes.py:1` with `approved` plus `feedback`.
 On reject, the grader feedback routes back to the generator for another draft.
-Guard iterations below 3, else accept the last draft to avoid infinite loops.
+Guard iterations below 3 in `ws/src/agent/routes.py:1`, else accept the last draft to avoid infinite loops.
+The loop compiles via `make_evaluator_agent` in `ws/src/agent/graph.py:1` sharing `GraphState`.
 Done when a rude first draft converges to an approved reply within the guard.
 
 ## Shared wiring
