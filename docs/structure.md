@@ -68,6 +68,7 @@ langgraph-template/
 │   └── studio_ui.png        # LangGraph Studio asset, optional
 ├── docker-compose.yml       # postgres plus pgvector for checkpoints and memory
 ├── langgraph.json           # graphs, dependencies, env pointer
+├── opencode.json            # references: wiki -> ../langgraph-template.wiki
 ├── pyproject.toml           # deps and src layout, use uv
 ├── uv.lock
 ├── .env.example
@@ -115,6 +116,12 @@ Example:
 
 Extra specialists join as subgraph nodes of the main graph sharing `GraphState`.
 They inherit the parent checkpointer, so no extra persistence setup is needed.
+
+### `opencode.json`
+
+This file declares the `wiki` reference to `../langgraph-template.wiki`.
+Attach `wiki` when SDLC notes matter.
+Templates for steps 1 requirements, 2 architecture, 3 design, 4 plan live in `~/.config/opencode/templates/flow/`.
 
 ### `src/agent/state.py`
 
