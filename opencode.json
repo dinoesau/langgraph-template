@@ -1,0 +1,9 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "references": {
+    "wiki": {
+      "path": "../langgraph-template.wiki",
+      "description": "Project Wiki checkout. Use for SDLC notes. Templates for steps 1 requirements, 2 architecture, 3 design, 4 plan live in ~/.config/opencode/templates/flow/."
+    }
+  }
+}
