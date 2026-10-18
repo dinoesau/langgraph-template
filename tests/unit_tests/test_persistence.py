@@ -11,7 +11,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from agent.graph import graph, make_the_agent
-from services.database import EXCLUDED_TABLES, alembic_include_object
+from services.database import EXCLUDED_TABLES, alembic_include_object, normalize_postgres_uri
 
 
 def test_ephemeral_graph_stays_stateless() -> None:
@@ -58,3 +58,16 @@ def test_migrations_exclude_framework_tables() -> None:
         assert alembic_include_object(None, table, "table", False, None) is False
     for table in ("users", "sessions"):
         assert alembic_include_object(None, table, "table", False, None) is True
+
+
+def test_normalize_postgres_uri() -> None:
+    assert normalize_postgres_uri("") == ""
+    assert normalize_postgres_uri("   ") == ""
+    assert (
+        normalize_postgres_uri("postgresql://postgres:postgres@localhost:5432/postgres")
+        == "postgresql://postgres:postgres@localhost:5432/postgres"
+    )
+    assert (
+        normalize_postgres_uri("postgres://postgres:postgres@localhost:5432/postgres")
+        == "postgresql://postgres:postgres@localhost:5432/postgres"
+    )

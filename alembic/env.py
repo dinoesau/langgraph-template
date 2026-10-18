@@ -11,13 +11,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from core.config import get_settings  # noqa: E402
 from models import Base  # noqa: E402
-from services.database import alembic_include_object  # noqa: E402
+from services.database import alembic_include_object, normalize_postgres_uri  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-postgres_uri = get_settings().postgres_uri
+postgres_uri = normalize_postgres_uri(get_settings().postgres_uri)
 if not postgres_uri:
     raise RuntimeError("POSTGRES_URI must be set to run migrations")
 # Sync migrations run on psycopg3, whose SQLAlchemy dialect needs the explicit prefix.

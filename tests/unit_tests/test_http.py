@@ -76,3 +76,17 @@ def test_chat_isolates_threads() -> None:
         client.post("/api/v1/chat", json={"message": "one", "thread_id": "a"})
         other = client.post("/api/v1/chat", json={"message": "two", "thread_id": "b"})
     assert other.json()["reply"] == "Echo: two"
+
+
+def test_chat_stream_resumes_thread() -> None:
+    app = create_app(lifespan=memory_lifespan)
+    with TestClient(app) as client:
+        with client.stream(
+            "POST", "/api/v1/chat/stream", json={"message": "one", "thread_id": "s1"}
+        ) as first:
+            assert first.status_code == 200
+            assert "Echo: one" in "".join(first.iter_text())
+        second = client.post("/api/v1/chat", json={"message": "two", "thread_id": "s1"})
+    assert second.status_code == 200
+    state = app.state.agent_graph.get_state({"configurable": {"thread_id": "s1"}})
+    assert [m.content for m in state.values["messages"]] == ["one", "Echo: one", "two", "Echo: two"]

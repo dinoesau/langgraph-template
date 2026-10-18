@@ -24,10 +24,18 @@ def alembic_include_object(
     return not (type_ == "table" and name in EXCLUDED_TABLES)
 
 
+def normalize_postgres_uri(raw: str) -> str:
+    """Strip whitespace and unify the scheme so app and migrations read one value."""
+    uri = raw.strip()
+    if uri.startswith("postgres://"):
+        return "postgresql://" + uri[len("postgres://") :]
+    return uri
+
+
 @asynccontextmanager
 async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Attach a persisted loop when POSTGRES_URI is set, else leave the ephemeral graph."""
-    postgres_uri = get_settings().postgres_uri
+    postgres_uri = normalize_postgres_uri(get_settings().postgres_uri)
     if not postgres_uri:
         yield
         return
