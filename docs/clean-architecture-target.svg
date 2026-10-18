@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="Helvetica, Arial, sans-serif">
 <rect x="4" y="4" width="1232" height="792" rx="18" fill="#f4f4f4" stroke="#333" stroke-width="3"/>
-<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target (S0 to S8 build reference) v6</text>
+<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target (S0 to S8 build reference) v7</text>
 <text x="620" y="64" text-anchor="middle" font-size="12" font-style="italic" fill="#555">verified 2026-10-18: #1 confirmed tradeoff, #2 target-only + wiki 3.3 vs 6.1 conflict</text>
 
 <!-- rings -->
@@ -52,13 +52,13 @@
 <text x="600" y="270" fill="#333">● chat/stream + health handlers · ● ChatResponse · ● api/deps</text>
 <text x="600" y="288" fill="#333">● lifespan + checkpointer + boundary · ○ user/session CRUD (S4)</text>
 <text x="600" y="306" fill="#333">○ auth handlers + tokens (S4) · ○ metrics handler (S6)</text>
-<text x="600" y="324" fill="#333">○ llm registry + fallback (S3) · ○ memory search/store (S2b)</text>
-<text x="600" y="342" fill="#333">○ cache front (S2b) · ○ limiter + middleware (S4/S6) · ○ eval runner (S7b)</text>
+<text x="600" y="324" fill="#333">○ llm registry + fallback (S3) · ● memory search/store (S2b)</text>
+<text x="600" y="342" fill="#333">● cache front (S2b) · ○ limiter + middleware (S4/S6) · ○ eval runner (S7b)</text>
 <text x="600" y="360" fill="#333">Rule: handlers read via api/deps, never direct service imports.</text>
 
 <text x="600" y="388" font-size="17" font-weight="bold" fill="#333">Drivers — swappable without touching the core</text>
 <text x="600" y="408" fill="#333">● FastAPI/uvicorn · ● Postgres · ● Alembic/SQLAlchemy · ● LangGraph</text>
-<text x="600" y="426" fill="#333">○ pgvector switch (S2b) · ○ Valkey (S2b) · ○ OpenAI/Anthropic/Google (S3)</text>
+<text x="600" y="426" fill="#333">● Postgres store + pool (S2b) · ● Valkey (S2b) · ○ OpenAI/Anthropic/Google (S3)</text>
 <text x="600" y="444" fill="#333">○ LangSmith/Langfuse (S6) · ○ Prometheus/Grafana (S6) · ○ Compose + CI (S8)</text>
 
 <text x="600" y="472" font-size="17" font-weight="bold" fill="#333">Full-turn flow (target only, not shipped)</text>
