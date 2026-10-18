@@ -11,9 +11,14 @@ from agent.graph import AgentGraph, graph, make_the_agent
 from core.config import get_settings
 
 # Tables managed outside Alembic: LangGraph owns checkpoints, memory owns vectors.
-# shortcut: memory vector table joins this set when the memory slice lands.
 EXCLUDED_TABLES: frozenset[str] = frozenset(
-    {"checkpoints", "checkpoint_blobs", "checkpoint_writes", "checkpoint_migrations"}
+    {
+        "checkpoints",
+        "checkpoint_blobs",
+        "checkpoint_writes",
+        "checkpoint_migrations",
+        "memory_vectors",
+    }
 )
 
 
@@ -40,11 +45,16 @@ def get_agent_graph(app: FastAPI) -> AgentGraph:
 @asynccontextmanager
 async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Attach a persisted loop when POSTGRES_URI is set, else leave the ephemeral graph."""
+    from services.memory import ensure_memory_schema, schedule_store, search
+
     postgres_uri = normalize_postgres_uri(get_settings().postgres_uri)
     if not postgres_uri:
         yield
         return
     async with AsyncPostgresSaver.from_conn_string(postgres_uri) as saver:
         await saver.setup()
-        app.state.agent_graph = make_the_agent(checkpointer=saver)
+        await ensure_memory_schema()
+        app.state.agent_graph = make_the_agent(
+            checkpointer=saver, recall_hook=search, store_hook=schedule_store
+        )
         yield

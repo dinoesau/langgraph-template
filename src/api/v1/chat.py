@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
 
 from agent.graph import AgentGraph
-from api.deps import get_request_graph
+from api.deps import get_request_graph, get_request_user_id
 
 router = APIRouter(tags=["chat"])
 
@@ -38,11 +38,11 @@ class ChatResponse(BaseModel):
     thread_id: str
 
 
-async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str) -> str:
+async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str, user_id: str) -> str:
     """Run one loop turn on its thread and return the assistant text."""
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": thread_id}},
+        config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
     )
     last = result["messages"][-1]
     if isinstance(last, AIMessage) and isinstance(last.content, str):
@@ -50,11 +50,13 @@ async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str) -> str:
     raise RuntimeError("loop returned no assistant text")
 
 
-async def _stream_loop(agent: AgentGraph, message: str, thread_id: str) -> AsyncIterator[str]:
+async def _stream_loop(
+    agent: AgentGraph, message: str, thread_id: str, user_id: str
+) -> AsyncIterator[str]:
     """Yield server-sent event chunks from one loop turn on its thread."""
     async for chunk in agent.astream(
         {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": thread_id}},
+        config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
         stream_mode="updates",
     ):
         for node_output in chunk.values():
@@ -65,23 +67,27 @@ async def _stream_loop(agent: AgentGraph, message: str, thread_id: str) -> Async
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
-    body: ChatRequest, agent: Annotated[AgentGraph, Depends(get_request_graph)]
+    body: ChatRequest,
+    agent: Annotated[AgentGraph, Depends(get_request_graph)],
+    user_id: Annotated[str, Depends(get_request_user_id)],
 ) -> ChatResponse:
     """Delegate one turn to the loop and return its reply."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return ChatResponse(
-        reply=await _invoke_loop(agent, body.message, thread_id),
+        reply=await _invoke_loop(agent, body.message, thread_id, user_id),
         thread_id=thread_id,
     )
 
 
 @router.post("/chat/stream")
 def chat_stream(
-    body: ChatRequest, agent: Annotated[AgentGraph, Depends(get_request_graph)]
+    body: ChatRequest,
+    agent: Annotated[AgentGraph, Depends(get_request_graph)],
+    user_id: Annotated[str, Depends(get_request_user_id)],
 ) -> StreamingResponse:
     """Delegate one turn to the loop and stream its reply back."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return StreamingResponse(
-        _stream_loop(agent, body.message, thread_id),
+        _stream_loop(agent, body.message, thread_id, user_id),
         media_type="text/event-stream",
     )
