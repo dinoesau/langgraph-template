@@ -14,9 +14,9 @@ import logging
 from langchain_core.messages import BaseMessage
 from langgraph.store.base import BaseStore
 
-from core.memory import format_recall, memory_namespace
+from core.memory import memory_namespace
 
-__all__ = ["extract_memories", "format_recall", "memory_namespace", "persist_turn"]
+__all__ = ["extract_memories", "persist_turn"]
 
 logger = logging.getLogger("memory")
 

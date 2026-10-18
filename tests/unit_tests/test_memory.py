@@ -19,7 +19,8 @@ from agent.graph import make_the_agent
 from api.app import create_app
 from core.cache import RecallCache, build_cache, build_memory_key
 from core.config import get_settings
-from services.memory import extract_memories, format_recall, memory_namespace, persist_turn
+from core.memory import format_recall, memory_namespace
+from services.memory import extract_memories, persist_turn
 
 
 @pytest.fixture(name="clean_env")
