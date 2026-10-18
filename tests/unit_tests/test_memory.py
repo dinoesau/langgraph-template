@@ -385,6 +385,28 @@ def test_cache_close_is_safe_without_server(clean_env: None) -> None:
     asyncio.run(_run())
 
 
+def test_overlong_user_id_degrades_closed(clean_env: None) -> None:
+    from starlette.requests import Request
+
+    from api.deps import get_request_user_id
+
+    def _request(uid: str) -> Request:
+        return Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/api/v1/chat",
+                "headers": [(b"x-user-id", uid.encode())],
+            }
+        )
+
+    long_a = "a" * 128 + "1"
+    long_b = "a" * 128 + "2"
+    assert get_request_user_id(_request(long_a)) == ""
+    assert get_request_user_id(_request(long_b)) == ""
+    assert get_request_user_id(_request("alice")) == "alice"
+
+
 def test_lifespan_closes_cache_on_shutdown(
     clean_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -420,3 +442,4 @@ def test_lifespan_closes_cache_on_shutdown(
     with TestClient(create_app()):
         pass
     assert "async" in closed
+    assert "sync" in closed
