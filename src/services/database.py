@@ -79,7 +79,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     settings = get_settings()
     postgres_uri = normalize_postgres_uri(settings.postgres_uri)
-    cache = build_cache(settings.valkey_host, max_entries=settings.cache_max_entries)
+    cache = build_cache(settings.valkey_host)
     app.state.recall_cache = cache
     if not postgres_uri:
         store: BaseStore = InMemoryStore()
