@@ -7,14 +7,14 @@ This guide describes the target design for this starter.
 ## Status
 
 Short term state lives in the graph checkpointer.
-`GraphState` in `ws/src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-Graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `ws/docs/structure.md:132`.
-See `ws/src/agent/graph.py:1` for the planned wiring point.
-See `ws/docs/structure.md:172` for the `ws/src/services/memory.py:1` role.
-See `ws/docs/structure.md:165` for the `ws/src/core/cache.py:1` role.
+`GraphState` in `src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
+Graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `docs/structure.md:140`.
+See `src/agent/graph.py:1` for the planned wiring point.
+See `docs/structure.md:180` for the `src/services/memory.py:1` role.
+See `docs/structure.md:173` for the `src/core/cache.py:1` role.
 Semantic memory and cache are both marked as planned.
-Today only `ws/src/agent/__init__.py:1` exists in code.
-Today `ws/docker-compose.yml:1` only starts postgres.
+Today only `src/agent/__init__.py:1` exists in code.
+Today `docker-compose.yml:1` only starts postgres.
 
 ## Overview
 
@@ -83,8 +83,8 @@ The chat response will stay correct even when memory fails.
 | VALKEY_HOST | empty | Set to enable shared cache |
 
 Values above are planned.
-See `ws/.env.example:1` for the current env template.
-`POSTGRES_URI` in `ws/.env.example:5` will back both checkpoints and vectors.
+See `.env.example:1` for the current env template.
+`POSTGRES_URI` in `.env.example:5` will back both checkpoints and vectors.
 
 ## Startup pre-warming
 
@@ -92,9 +92,9 @@ The service will open its vector connection at startup.
 It will check the collection schema before serving traffic.
 This will avoid paying cold init cost on the first request.
 The call will live in the app lifespan when FastAPI exists.
-See `ws/docs/structure.md:173` for the database lifespan role.
-Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `ws/docs/structure.md:184`.
-Tools live in `ws/src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
+See `docs/structure.md:181` for the database lifespan role.
+Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
+Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
 
 ## Per-user isolation
 
@@ -105,16 +105,16 @@ Session scope will still come from `thread_id` in the checkpointer.
 
 ## What exists today
 
-`ws/docker-compose.yml:1` starts postgres on port 5432.
+`docker-compose.yml:1` starts postgres on port 5432.
 It has no pgvector extension yet.
 It has no Valkey service yet.
-`ws/pyproject.toml:1` has no vector or memory dependency yet.
-`ws/langgraph.json:1` only maps the graph and env file.
+`pyproject.toml:1` has no vector or memory dependency yet.
+`langgraph.json:1` only maps the graph and env file.
 
 ## Next steps
 
-Add `ws/src/services/memory.py:1` with search and add functions.
-Add `ws/src/core/cache.py:1` with Valkey plus in-memory fallback.
-Extend `ws/docker-compose.yml:1` with pgvector and Valkey.
-Add env vars to `ws/.env.example:1` for collection and TTL.
-Wire memory search into the chat node in `ws/src/agent/graph.py:1`.
+Add `src/services/memory.py:1` with search and add functions.
+Add `src/core/cache.py:1` with Valkey plus in-memory fallback.
+Extend `docker-compose.yml:1` with pgvector and Valkey.
+Add env vars to `.env.example:1` for collection and TTL.
+Wire memory search into the chat node in `src/agent/graph.py:1`.

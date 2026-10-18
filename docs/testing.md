@@ -29,7 +29,7 @@ E2E tests will simulate a real user against the entire running stack.
 That full stack is planned and does not exist yet.
 Bring it up with a full `docker compose up` once it lands: API server plus real postgres plus planned cache.
 Drive the stack over HTTP against `POST /api/v1/chat` with a session token.
-See `ws/docs/authentication.md:1` for the auth flow.
+See `docs/authentication.md:1` for the auth flow.
 Seed the database with a known predictable state before the suite runs.
 Tear the stack down after, so local development data is never polluted.
 There is no frontend in this repo, so E2E means API-level journeys, not browser automation.
