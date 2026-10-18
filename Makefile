@@ -45,7 +45,7 @@ check_paths:
 	@! grep -rn 'ws/' docs README.md AGENTS.md
 
 check_mermaid:
-	bash scripts/check-mermaid.sh
+	bash scripts/check-mermaid.sh $(PATHS)
 
 help:
 	@echo "Targets:"
@@ -61,4 +61,4 @@ help:
 	@echo "  spell_check       - codespell (solo reporta)"
 	@echo "  spell_fix         - codespell con --write-changes"
 	@echo "  check_paths       - falla si hay prefijos ws/ obsoletos en docs"
-	@echo "  check_mermaid     - compila cada bloque mermaid (necesita npx)"
+	@echo "  check_mermaid [PATHS=...] - compila diagramas mermaid dados o los del repo (necesita npx)"
