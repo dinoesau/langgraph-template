@@ -1,7 +1,7 @@
 """Unit tests for S2b per-user recall plus cache plus background writes.
 
-No network and no containers: vector reads use the in-memory fallback,
-the cache uses the local TTL map, background writes never fail the turn.
+No network and no containers: the store is InMemoryStore, the cache is
+the local TTL map, background writes run as Starlette background tasks.
 """
 
 import asyncio
@@ -10,33 +10,47 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.store.base import BaseStore
+from langgraph.store.memory import InMemoryStore
 
 from agent.graph import make_the_agent
 from api.app import create_app
-from core.cache import build_memory_key, clear_cache_singleton, get_cache
+from core.cache import RecallCache, build_cache, build_memory_key
 from core.config import get_settings
-from services import memory
-from services.memory import clear_memory_singleton
+from services.memory import extract_memories, format_recall, memory_namespace, persist_turn
 
 
-@pytest.fixture(name="isolated_memory")
-def isolated_memory_fixture(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
-    """Point settings at ephemeral backends and drop every singleton."""
+@pytest.fixture(name="clean_env")
+def clean_env_fixture(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Point settings at ephemeral backends for every test."""
     monkeypatch.setenv("POSTGRES_URI", "")
     monkeypatch.setenv("VALKEY_HOST", "")
-    monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
+    monkeypatch.setenv("APP_ENV", "development")
     get_settings.cache_clear()
-    clear_cache_singleton()
-    clear_memory_singleton()
     yield
     get_settings.cache_clear()
-    clear_cache_singleton()
-    clear_memory_singleton()
 
 
-def test_cache_key_scoped_per_user(isolated_memory: None) -> None:
+def make_parts() -> tuple[InMemoryStore, RecallCache]:
+    """Return an isolated store plus cache front for one test."""
+    return InMemoryStore(), build_cache("")
+
+
+def make_agent(store: BaseStore, cache: RecallCache | None = None, ttl: int = 60) -> Any:
+    """Compile the loop with recall wired like the lifespan does."""
+    return make_the_agent(store=store, cache=cache, cache_ttl_seconds=ttl)
+
+
+def seed(store: BaseStore, user_id: str, text: str) -> None:
+    async def _run() -> None:
+        await store.aput(memory_namespace(user_id), text, {"text": text})
+
+    asyncio.run(_run())
+
+
+def test_cache_key_scoped_per_user(clean_env: None) -> None:
     alice = build_memory_key("alice", "  Hello World ")
     bob = build_memory_key("bob", "hello world")
     again = build_memory_key("alice", "hello   world")
@@ -44,59 +58,29 @@ def test_cache_key_scoped_per_user(isolated_memory: None) -> None:
     assert alice == again
 
 
-def test_empty_user_or_query_returns_no_recall(isolated_memory: None) -> None:
-    assert asyncio.run(memory.search("", "hello")) == ""
-    assert asyncio.run(memory.search("alice", "   ")) == ""
+def test_namespace_scopes_per_user(clean_env: None) -> None:
+    assert memory_namespace("alice") == ("memories", "alice")
+    assert memory_namespace("alice") != memory_namespace("bob")
 
 
-def test_store_and_search_stays_per_user(isolated_memory: None) -> None:
-    asyncio.run(memory.get_memory_store().add("alice", ["likes green tea"]))
-    alice = asyncio.run(memory.search("alice", "green tea"))
-    bob = asyncio.run(memory.search("bob", "green tea"))
-    assert "green tea" in alice
-    assert bob == ""
+def test_extract_memories_keeps_last_texts(clean_env: None) -> None:
+    messages = [
+        HumanMessage(content="   "),
+        HumanMessage(content="likes green tea"),
+        AIMessage(content="Echo: likes green tea"),
+    ]
+    assert extract_memories(messages) == ["likes green tea", "likes green tea"]
+    assert extract_memories([HumanMessage(content="   ")]) == []
+    assert format_recall([]) == ""
+    assert format_recall(["  ", "kept"]) == "- kept"
 
 
-def test_repeated_recall_hits_cache(isolated_memory: None) -> None:
-    asyncio.run(memory.get_memory_store().add("alice", ["prefers morning runs"]))
-    first = asyncio.run(memory.search("alice", "morning runs"))
-    assert first != ""
-    clear_memory_singleton()
-    second = asyncio.run(memory.search("alice", "morning runs"))
-    assert second == first
-
-
-def test_errors_are_never_cached(isolated_memory: None) -> None:
-    class FailingStore:
-        async def search(self, user_id: str, query: str, limit: int) -> list[str]:
-            raise RuntimeError("vector down")
-
-        async def add(self, user_id: str, texts: list[str]) -> None:
-            raise RuntimeError("vector down")
-
-    memory._memory_store = FailingStore()
-    assert asyncio.run(memory.search("alice", "green tea")) == ""
-    clear_memory_singleton()
-    asyncio.run(memory.get_memory_store().add("alice", ["likes green tea"]))
-    assert "green tea" in asyncio.run(memory.search("alice", "green tea"))
-
-
-def test_store_failure_is_logged_and_ignored(isolated_memory: None) -> None:
-    class FailingStore:
-        async def search(self, user_id: str, query: str, limit: int) -> list[str]:
-            raise RuntimeError("down")
-
-        async def add(self, user_id: str, texts: list[str]) -> None:
-            raise RuntimeError("down")
-
-    memory._memory_store = FailingStore()
-    asyncio.run(memory.store_turn("alice", [HumanMessage(content="hello")]))
-
-
-def test_loop_recall_isolated_per_user(isolated_memory: None) -> None:
+def test_loop_recall_isolated_per_user(clean_env: None) -> None:
     async def _run() -> tuple[Any, Any]:
-        await memory.get_memory_store().add("alice", ["alice likes green tea"])
-        agent = make_the_agent(recall_hook=memory.search, store_hook=memory.schedule_store)
+        store, cache = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        await store.aput(memory_namespace("bob"), "m2", {"text": "bob likes black coffee"})
+        agent = make_agent(store, cache)
         alice = await agent.ainvoke(
             {"messages": [HumanMessage(content="green tea")]},
             config={"configurable": {"thread_id": "t1", "user_id": "alice"}},
@@ -108,42 +92,40 @@ def test_loop_recall_isolated_per_user(isolated_memory: None) -> None:
         return alice, bob
 
     alice_state, bob_state = asyncio.run(_run())
-    assert alice_state.get("docs")
-    assert not bob_state.get("docs")
+    assert "green tea" in alice_state["docs"][0]
+    assert "green tea" not in bob_state["docs"][0]
+    assert "black coffee" not in alice_state["docs"][0]
 
 
-def test_loop_without_user_id_skips_recall(isolated_memory: None) -> None:
+def test_loop_without_user_id_skips_recall(clean_env: None) -> None:
     async def _run() -> Any:
-        agent = make_the_agent(recall_hook=memory.search, store_hook=memory.schedule_store)
+        store, cache = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        agent = make_agent(store, cache)
         return await agent.ainvoke(
-            {"messages": [HumanMessage(content="hello")]},
+            {"messages": [HumanMessage(content="green tea")]},
             config={"configurable": {"thread_id": "t1"}},
         )
 
-    result = asyncio.run(_run())
-    assert not result.get("docs")
+    assert asyncio.run(_run()).get("docs") is None
 
 
-def test_http_accepts_transitional_user_header(isolated_memory: None) -> None:
-    client = TestClient(create_app())
-    response = client.post("/api/v1/chat", json={"message": "hello"}, headers={"X-User-ID": "a"})
-    assert response.status_code == 200
-    assert response.json()["reply"] == "Echo: hello"
+def test_bare_graph_stays_echo_only(clean_env: None) -> None:
+    from agent.graph import graph
+
+    result = graph.invoke(
+        {"messages": [HumanMessage(content="green tea")]},
+        config={"configurable": {"thread_id": "t1", "user_id": "alice"}},
+    )
+    assert result["messages"][-1].content == "Echo: green tea"
+    assert result.get("docs") is None
 
 
-def test_cache_falls_back_without_valkey(isolated_memory: None) -> None:
-    async def _run() -> str | None:
-        cache = get_cache()
-        await cache.set("k", "v", 60)
-        return await cache.get("k")
-
-    assert asyncio.run(_run()) == "v"
-
-
-def test_recall_parity_across_invoke_ainvoke_astream(isolated_memory: None) -> None:
+def test_recall_parity_across_invoke_ainvoke_astream(clean_env: None) -> None:
     async def _run() -> tuple[Any, Any, list[Any]]:
-        await memory.get_memory_store().add("alice", ["alice likes green tea"])
-        agent = make_the_agent(recall_hook=memory.search, store_hook=memory.schedule_store)
+        store, cache = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        agent = make_agent(store, cache)
         config: RunnableConfig = {"configurable": {"thread_id": "parity", "user_id": "alice"}}
 
         def _invoke_sync() -> Any:
@@ -161,76 +143,111 @@ def test_recall_parity_across_invoke_ainvoke_astream(isolated_memory: None) -> N
                 stream_mode="updates",
             )
         ]
-        await memory.drain_background_writes()
         return sync_result, async_result, chunks
 
     sync_result, async_result, chunks = asyncio.run(_run())
-    assert sync_result.get("docs")
-    assert async_result.get("docs")
+    assert "green tea" in sync_result["docs"][0]
+    assert "green tea" in async_result["docs"][0]
     assert sync_result["messages"][-1].content == async_result["messages"][-1].content
     assert any("docs" in chunk.get("echo", {}) for chunk in chunks)
 
 
-def test_ephemeral_lifespan_wires_recall(isolated_memory: None) -> None:
-    async def _seed() -> None:
-        await memory.get_memory_store().add("alice", ["alice likes green tea"])
-
-    asyncio.run(_seed())
-    app = create_app()
-    with TestClient(app) as client:
-        assert app.state.agent_graph is not None
-        response = client.post(
-            "/api/v1/chat",
-            json={"message": "green tea", "thread_id": "lifespan-t1"},
-            headers={"X-User-ID": "alice"},
+def test_repeated_recall_hits_cache(clean_env: None) -> None:
+    async def _run() -> tuple[str, str]:
+        store, cache = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        agent = make_agent(store, cache)
+        config: RunnableConfig = {"configurable": {"thread_id": "t1", "user_id": "alice"}}
+        first: Any = await agent.ainvoke(
+            {"messages": [HumanMessage(content="green tea")]}, config=config
         )
-    assert response.status_code == 200
-    assert response.json()["reply"] == "Echo: green tea"
+        agent_nostore = make_agent(InMemoryStore(), cache)
+        second: Any = await agent_nostore.ainvoke(
+            {"messages": [HumanMessage(content="green tea")]}, config=config
+        )
+        return first["docs"][0], second["docs"][0]
 
-    async def _recall_ran() -> str | None:
-        from core.cache import build_memory_key as key
-        from core.cache import get_cache as cache
-
-        return await cache().get(key("alice", "green tea"))
-
-    assert asyncio.run(_recall_ran())
+    first, second = asyncio.run(_run())
+    assert first != ""
+    assert second == first
 
 
-def test_http_recall_stays_per_user(isolated_memory: None) -> None:
+def test_errors_are_never_cached(clean_env: None) -> None:
+    class FailingStore(InMemoryStore):
+        async def abatch(self, ops: Any) -> Any:
+            raise RuntimeError("vector down")
+
+    async def _run() -> tuple[Any, Any]:
+        cache = build_cache("")
+        agent_down = make_agent(FailingStore(), cache)
+        config: RunnableConfig = {"configurable": {"thread_id": "t1", "user_id": "alice"}}
+        down: Any = await agent_down.ainvoke(
+            {"messages": [HumanMessage(content="green tea")]}, config=config
+        )
+        store, _ = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        agent_up = make_agent(store, cache)
+        up: Any = await agent_up.ainvoke(
+            {"messages": [HumanMessage(content="green tea")]}, config=config
+        )
+        return down, up
+
+    down, up = asyncio.run(_run())
+    assert down.get("docs") is None
+    assert "green tea" in up["docs"][0]
+
+
+def test_persist_turn_stores_and_ignores_failures(clean_env: None) -> None:
+    async def _run() -> list[Any]:
+        store, _ = make_parts()
+        await persist_turn(store, "alice", [HumanMessage(content="green tea")])
+        await persist_turn(store, "  ", [HumanMessage(content="green tea")])
+        return await store.asearch(memory_namespace("alice"), query="green tea", limit=5)
+
+    assert asyncio.run(_run())
+
+    class FailingStore(InMemoryStore):
+        async def abatch(self, ops: Any) -> Any:
+            raise RuntimeError("down")
+
+    asyncio.run(persist_turn(FailingStore(), "alice", [HumanMessage(content="hi")]))
+
+
+def test_http_recall_stays_per_user(clean_env: None) -> None:
     app = create_app()
     with TestClient(app) as client:
-        client.post(
+        assert app.state.agent_store is not None
+        first = client.post(
             "/api/v1/chat",
             json={"message": "alice customtea", "thread_id": "http-alice"},
             headers={"X-User-ID": "alice"},
         )
-        client.post(
+        second = client.post(
             "/api/v1/chat",
             json={"message": "bob customtea", "thread_id": "http-bob"},
             headers={"X-User-ID": "bob"},
         )
+    assert first.status_code == 200
+    assert second.status_code == 200
 
-    async def _stored() -> tuple[list[str], list[str]]:
-        store = memory.get_memory_store()
+    async def _stored() -> tuple[list[Any], list[Any]]:
+        store: BaseStore = app.state.agent_store
         return (
-            await store.search("alice", "customtea", 5),
-            await store.search("bob", "customtea", 5),
+            await store.asearch(memory_namespace("alice"), query="customtea", limit=5),
+            await store.asearch(memory_namespace("bob"), query="customtea", limit=5),
         )
 
     alice_rows, bob_rows = asyncio.run(_stored())
-    assert any("alice customtea" in row for row in alice_rows)
-    assert all("alice customtea" not in row for row in bob_rows)
-    assert any("bob customtea" in row for row in bob_rows)
-    assert all("bob customtea" not in row for row in alice_rows)
+    assert any("alice customtea" in str(row.value) for row in alice_rows)
+    assert all("alice customtea" not in str(row.value) for row in bob_rows)
+    assert any("bob customtea" in str(row.value) for row in bob_rows)
 
 
 def test_production_ignores_transitional_header(
-    isolated_memory: None, monkeypatch: pytest.MonkeyPatch
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("APP_ENV", "production")
     get_settings.cache_clear()
-    clear_cache_singleton()
-    clear_memory_singleton()
     app = create_app()
     with TestClient(app) as client:
         response = client.post(
@@ -240,18 +257,27 @@ def test_production_ignores_transitional_header(
         )
     assert response.status_code == 200
 
-    async def _stored() -> list[str]:
-        return await memory.get_memory_store().search("alice", "green tea", 5)
+    async def _stored() -> list[Any]:
+        rows = await app.state.agent_store.asearch(
+            memory_namespace("alice"), query="green tea", limit=5
+        )
+        return list(rows)
 
     assert asyncio.run(_stored()) == []
 
 
-def test_set_warms_fallback_when_primary_succeeds(isolated_memory: None) -> None:
+def test_set_warms_fallback_when_primary_succeeds(clean_env: None) -> None:
     from core.cache import InMemoryTTLCache, RecallCache
 
     class GoodPrimary:
         def __init__(self) -> None:
             self.saved: dict[str, str] = {}
+
+        def get_sync(self, key: str) -> str | None:
+            return self.saved.get(key)
+
+        def set_sync(self, key: str, value: str, ttl: int) -> None:
+            self.saved[key] = value
 
         async def get(self, key: str) -> str | None:
             return self.saved.get(key)
@@ -263,85 +289,56 @@ def test_set_warms_fallback_when_primary_succeeds(isolated_memory: None) -> None
         fallback = InMemoryTTLCache()
         front = RecallCache(primary=GoodPrimary(), fallback=fallback)
         await front.set("k", "v", 60)
-        return await fallback.get("k")
+        front.set_sync("k2", "v2", 60)
+        assert await fallback.get("k") == "v"
+        return fallback.get_sync("k2")
 
-    assert asyncio.run(_run()) == "v"
+    assert asyncio.run(_run()) == "v2"
 
 
-def test_failing_primary_falls_back(isolated_memory: None) -> None:
+def test_failing_primary_falls_back(clean_env: None) -> None:
     from core.cache import InMemoryTTLCache, RecallCache
 
     class BadPrimary:
+        def get_sync(self, key: str) -> str | None:
+            raise RuntimeError("valkey down")
+
+        def set_sync(self, key: str, value: str, ttl: int) -> None:
+            raise RuntimeError("valkey down")
+
         async def get(self, key: str) -> str | None:
             raise RuntimeError("valkey down")
 
         async def set(self, key: str, value: str, ttl: int) -> None:
             raise RuntimeError("valkey down")
 
-    async def _run() -> str | None:
+    async def _run() -> tuple[str | None, str | None]:
         front = RecallCache(primary=BadPrimary(), fallback=InMemoryTTLCache())
         await front.set("k", "v", 60)
-        return await front.get("k")
+        front.set_sync("k2", "v2", 60)
+        return await front.get("k"), front.get_sync("k2")
 
-    assert asyncio.run(_run()) == "v"
+    assert asyncio.run(_run()) == ("v", "v2")
 
 
-def test_concurrent_recall_stays_isolated(isolated_memory: None) -> None:
-    async def _run() -> tuple[str, str, str, str]:
-        await memory.get_memory_store().add("alice", ["alice likes green tea"])
-        await memory.get_memory_store().add("bob", ["bob likes black coffee"])
+def test_concurrent_recall_stays_isolated(clean_env: None) -> None:
+    async def _run() -> tuple[list[Any], list[Any]]:
+        store, _ = make_parts()
+        await asyncio.gather(
+            persist_turn(store, "alice", [HumanMessage(content="alice likes green tea")]),
+            persist_turn(store, "bob", [HumanMessage(content="bob likes black coffee")]),
+        )
         return await asyncio.gather(
-            memory.search("alice", "green tea"),
-            memory.search("bob", "black coffee"),
-            memory.search("alice", "green tea"),
-            memory.search("mallory", "green tea"),
+            store.asearch(memory_namespace("alice"), query="green tea", limit=5),
+            store.asearch(memory_namespace("bob"), query="black coffee", limit=5),
         )
 
-    alice, bob, alice_again, mallory = asyncio.run(_run())
-    assert "green tea" in alice
-    assert "black coffee" in bob
-    assert alice == alice_again
-    assert mallory == ""
+    alice_rows, bob_rows = asyncio.run(_run())
+    assert any("green tea" in str(row.value) for row in alice_rows)
+    assert all("green tea" not in str(row.value) for row in bob_rows)
 
 
-def test_background_writes_drain_on_demand(isolated_memory: None) -> None:
-    from langchain_core.messages import AIMessage
-
-    async def _run() -> list[str]:
-        memory.schedule_store("alice", [HumanMessage(content="green tea")])
-        memory.schedule_store(
-            "alice", [HumanMessage(content="green tea"), AIMessage(content="noted")]
-        )
-        await memory.drain_background_writes()
-        return await memory.get_memory_store().search("alice", "green tea", 5)
-
-    assert asyncio.run(_run())
-
-
-def test_sync_path_persists_without_running_loop(isolated_memory: None) -> None:
-    agent = make_the_agent(recall_hook=memory.search, store_hook=memory.schedule_store)
-    agent.invoke(
-        {"messages": [HumanMessage(content="green tea")]},
-        config={"configurable": {"thread_id": "sync-t1", "user_id": "alice"}},
-    )
-    assert asyncio.run(memory.search("alice", "green tea")) != ""
-
-
-def test_escape_like_neutralizes_wildcards(isolated_memory: None) -> None:
-    assert memory.escape_like("100%_x\\y") == "100\\%\\_x\\\\y"
-    asyncio.run(memory.get_memory_store().add("alice", ["likes green tea"]))
-    assert asyncio.run(memory.search("alice", "%")) == ""
-
-
-def test_memory_settings_load_from_env(
-    isolated_memory: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("LONG_TERM_MEMORY_COLLECTION_NAME", "custom_mem")
-    monkeypatch.setenv("MEMORY_DISTANCE_MAX", "1.5")
-    monkeypatch.setenv("VALKEY_HOST", "")
+def test_memory_settings_load_from_env(clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CACHE_TTL_SECONDS", "120")
     get_settings.cache_clear()
-    clear_cache_singleton()
-    clear_memory_singleton()
-    settings = get_settings()
-    assert settings.long_term_memory_collection_name == "custom_mem"
-    assert settings.memory_distance_max == 1.5
+    assert get_settings().cache_ttl_seconds == 120

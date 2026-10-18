@@ -59,7 +59,9 @@ def test_migrations_exclude_framework_tables() -> None:
         "checkpoint_blobs",
         "checkpoint_writes",
         "checkpoint_migrations",
-        "memory_vectors",
+        "store",
+        "store_vectors",
+        "store_migrations",
     }
     for table in EXCLUDED_TABLES:
         assert alembic_include_object(None, table, "table", False, None) is False
