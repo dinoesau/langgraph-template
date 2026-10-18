@@ -9,31 +9,19 @@ Valkey flap cannot cause a miss storm.
 import logging
 import threading
 import time
-from typing import Any, Protocol
+from typing import Any
+
+from agent.graph import RecallCachePort
 
 logger = logging.getLogger("cache")
 
 
-class SyncCacheBackend(Protocol):
-    """Synchronous backend shape for the sync loop path."""
-
-    def get_sync(self, key: str) -> str | None: ...
-    def set_sync(self, key: str, value: str, ttl: int) -> None: ...
-
-
-class AsyncCacheBackend(Protocol):
-    """Asynchronous backend shape for the async loop path."""
-
-    async def get(self, key: str) -> str | None: ...
-    async def set(self, key: str, value: str, ttl: int) -> None: ...
-
-
-class DualCacheBackend(SyncCacheBackend, AsyncCacheBackend, Protocol):
-    """One backend serving both loop paths, like the Valkey front."""
-
-
 class InMemoryTTLCache:
-    """Single-instance TTL map guarded by one lock for both paths."""
+    """Single-instance TTL map guarded by one lock for both paths.
+
+    One threading lock serves both paths because the sync path cannot hold
+    an asyncio lock; sections do dict-only work with no I/O inside.
+    """
 
     def __init__(self, max_entries: int = 1000) -> None:
         self._values: dict[str, tuple[str, float]] = {}
@@ -141,7 +129,7 @@ class RecallCache:
 
     def __init__(
         self,
-        primary: DualCacheBackend | None,
+        primary: RecallCachePort | None,
         fallback: InMemoryTTLCache,
     ) -> None:
         self._primary = primary
@@ -198,10 +186,10 @@ class RecallCache:
             await closer()
 
 
-def build_cache(host: str, max_entries: int = 1000) -> RecallCache:
+def build_cache(host: str) -> RecallCache:
     """Return a cache front with its own bounded fallback; empty host skips Valkey."""
     clean = host.strip()
-    fallback = InMemoryTTLCache(max_entries=max_entries)
+    fallback = InMemoryTTLCache()
     if not clean:
         return RecallCache(primary=None, fallback=fallback)
     return RecallCache(primary=ValkeyCache(host=clean), fallback=fallback)
