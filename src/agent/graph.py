@@ -1,22 +1,27 @@
 """Echo loop: proves the deploy contract with no model and no storage."""
 
-import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.config import get_store
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.base import BaseStore
 
 from agent.state import GraphState
+from core.cache import build_memory_key
+
+if TYPE_CHECKING:
+    from core.cache import RecallCache
 
 logger = logging.getLogger("agent")
 
-RecallHook = Callable[[str, str], Awaitable[str]]
-StoreHook = Callable[[str, list[BaseMessage]], None]
+MEMORY_NAMESPACE = "memories"
+DEFAULT_TOP_K = 4
 
 
 def _last_human_text(messages: Sequence[BaseMessage]) -> str:
@@ -38,38 +43,97 @@ def _request_user_id(config: RunnableConfig | None) -> str:
     return raw.strip() if isinstance(raw, str) else ""
 
 
+def _recall_text(hits: list[Any]) -> str:
+    """Render store hits as plain context text for the turn."""
+    texts = [str(item.value.get("text", "")).strip() for item in hits]
+    cleaned = [text for text in texts if text]
+    if not cleaned:
+        return ""
+    return "\n".join(f"- {text}" for text in cleaned)
+
+
+def _recall_sync(
+    store: BaseStore, cache: "RecallCache | None", ttl: int, user_id: str, query: str
+) -> str:
+    """Load per-user recall on the sync path; empty means inject nothing."""
+    if cache is not None:
+        try:
+            cached = cache.get_sync(build_memory_key(user_id, query))
+        except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
+            logger.warning("recall cache degraded: %s", exc)
+            cached = None
+        if cached:
+            return cached
+    try:
+        recall = _recall_text(
+            store.search((MEMORY_NAMESPACE, user_id), query=query, limit=DEFAULT_TOP_K)
+        )
+    except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
+        logger.warning("recall degraded: %s", exc)
+        return ""
+    if recall and cache is not None:
+        try:
+            cache.set_sync(build_memory_key(user_id, query), recall, ttl)
+        except Exception as exc:  # noqa: BLE001 - recall stands without cache
+            logger.warning("recall cache degraded: %s", exc)
+    return recall
+
+
+async def _recall_async(
+    store: BaseStore, cache: "RecallCache | None", ttl: int, user_id: str, query: str
+) -> str:
+    """Load per-user recall on the async path; empty means inject nothing."""
+    if cache is not None:
+        try:
+            cached = await cache.get(build_memory_key(user_id, query))
+        except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
+            logger.warning("recall cache degraded: %s", exc)
+            cached = None
+        if cached:
+            return cached
+    try:
+        hits = await store.asearch((MEMORY_NAMESPACE, user_id), query=query, limit=DEFAULT_TOP_K)
+        recall = _recall_text(hits)
+    except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
+        logger.warning("recall degraded: %s", exc)
+        return ""
+    if recall and cache is not None:
+        try:
+            await cache.set(build_memory_key(user_id, query), recall, ttl)
+        except Exception as exc:  # noqa: BLE001 - recall stands without cache
+            logger.warning("recall cache degraded: %s", exc)
+    return recall
+
+
 AgentGraph = CompiledStateGraph[Any, Any, Any, Any]
 
 
 def make_the_agent(
     checkpointer: BaseCheckpointSaver[str] | None = None,
     *,
-    recall_hook: RecallHook | None = None,
-    store_hook: StoreHook | None = None,
+    store: BaseStore | None = None,
+    cache: "RecallCache | None" = None,
+    cache_ttl_seconds: int = 60,
 ) -> AgentGraph:
-    """Compile the echo loop, persisting per thread only when given a checkpointer.
+    """Compile the echo loop with recall resolved through the bound store.
 
-    The lifespan owns the checkpointer plus the recall hooks and injects
-    them here, so the loop never imports outside layers directly.
-    Empty caller id means no recall and no write for that turn.
+    The lifespan owns the checkpointer plus the store plus the cache and
+    injects them here, so the loop never imports outside layers directly.
+    Empty caller id means no recall for that turn. A persisted graph needs
+    the async serving path when its checkpointer is async-only.
     """
 
     def echo_sync(state: GraphState, config: RunnableConfig | None = None) -> dict[str, list[Any]]:
         text = _last_human_text(state.get("messages", []))
+        reply = AIMessage(content=f"Echo: {text}")
         user_id = _request_user_id(config)
         recall = ""
-        if recall_hook is not None and user_id:
+        if user_id:
             try:
-                recall = asyncio.run(recall_hook(user_id, text))
+                recall = _recall_sync(get_store(), cache, cache_ttl_seconds, user_id, text)
             except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
                 logger.warning("recall degraded: %s", exc)
                 recall = ""
-        reply = AIMessage(content=f"Echo: {text}")
-        if store_hook is not None and user_id:
-            try:
-                store_hook(user_id, [*state.get("messages", []), reply])
-            except Exception as exc:  # noqa: BLE001 - hook miss keeps reply
-                logger.warning("background write degraded: %s", exc)
         if recall.strip():
             return {"messages": [reply], "docs": [recall]}
         return {"messages": [reply]}
@@ -80,18 +144,13 @@ def make_the_agent(
         text = _last_human_text(state.get("messages", []))
         user_id = _request_user_id(config)
         recall = ""
-        if recall_hook is not None and user_id:
+        if user_id:
             try:
-                recall = await recall_hook(user_id, text)
+                recall = await _recall_async(get_store(), cache, cache_ttl_seconds, user_id, text)
             except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
                 logger.warning("recall degraded: %s", exc)
                 recall = ""
         reply = AIMessage(content=f"Echo: {text}")
-        if store_hook is not None and user_id:
-            try:
-                store_hook(user_id, [*state.get("messages", []), reply])
-            except Exception as exc:  # noqa: BLE001 - hook miss keeps reply
-                logger.warning("background write degraded: %s", exc)
         if recall.strip():
             return {"messages": [reply], "docs": [recall]}
         return {"messages": [reply]}
@@ -100,7 +159,7 @@ def make_the_agent(
     builder.add_node("echo", RunnableLambda(echo_sync, afunc=echo_async))
     builder.add_edge(START, "echo")
     builder.add_edge("echo", END)
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile(checkpointer=checkpointer, store=store)
 
 
 graph = make_the_agent()
