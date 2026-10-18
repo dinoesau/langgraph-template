@@ -3,17 +3,15 @@
 import json
 import uuid
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, field_validator
 
-from agent.graph import graph
-
-AgentGraph = CompiledStateGraph[Any, Any, Any, Any]
+from agent.graph import AgentGraph
+from api.deps import get_request_graph
 
 router = APIRouter(tags=["chat"])
 
@@ -38,11 +36,6 @@ class ChatResponse(BaseModel):
 
     reply: str
     thread_id: str
-
-
-def _resolve_agent(request: Request) -> AgentGraph:
-    """Use the lifespan-persisted loop when present, else the ephemeral module graph."""
-    return getattr(request.app.state, "agent_graph", None) or graph
 
 
 async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str) -> str:
@@ -71,20 +64,24 @@ async def _stream_loop(agent: AgentGraph, message: str, thread_id: str) -> Async
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: Request, body: ChatRequest) -> ChatResponse:
+async def chat(
+    body: ChatRequest, agent: Annotated[AgentGraph, Depends(get_request_graph)]
+) -> ChatResponse:
     """Delegate one turn to the loop and return its reply."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return ChatResponse(
-        reply=await _invoke_loop(_resolve_agent(request), body.message, thread_id),
+        reply=await _invoke_loop(agent, body.message, thread_id),
         thread_id=thread_id,
     )
 
 
 @router.post("/chat/stream")
-def chat_stream(request: Request, body: ChatRequest) -> StreamingResponse:
+def chat_stream(
+    body: ChatRequest, agent: Annotated[AgentGraph, Depends(get_request_graph)]
+) -> StreamingResponse:
     """Delegate one turn to the loop and stream its reply back."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return StreamingResponse(
-        _stream_loop(_resolve_agent(request), body.message, thread_id),
+        _stream_loop(agent, body.message, thread_id),
         media_type="text/event-stream",
     )

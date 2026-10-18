@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from agent.graph import make_the_agent
+from agent.graph import AgentGraph, graph, make_the_agent
 from core.config import get_settings
 
 # Tables managed outside Alembic: LangGraph owns checkpoints, memory owns vectors.
@@ -30,6 +30,11 @@ def normalize_postgres_uri(raw: str) -> str:
     if uri.startswith("postgres://"):
         return "postgresql://" + uri[len("postgres://") :]
     return uri
+
+
+def get_agent_graph(app: FastAPI) -> AgentGraph:
+    """Return the lifespan-persisted loop when present, else the ephemeral module graph."""
+    return getattr(app.state, "agent_graph", None) or graph
 
 
 @asynccontextmanager

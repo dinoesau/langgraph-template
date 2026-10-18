@@ -44,6 +44,21 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
 | Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus settings plus HTTP without model calls |
 
+### Clean architecture rings
+
+![Clean architecture rings with this repo's modules](clean-architecture-rings.svg)
+
+Entities (`GraphState`, `User`, `Session`) know no HTTP or Postgres.
+The loop factory plus nodes are the use cases.
+HTTP handlers, `api/deps`, the lifespan in `services/database`, and `alembic/env` are adapters.
+Dependencies point inward; handlers resolve the loop through the `api/deps` Depends seam.
+
+### Target rings (S0 to S8)
+
+![Clean architecture target with all planned modules](clean-architecture-target.svg)
+
+Target is the destination map verified 2026-10-18: `GraphState` keeps the `MessagesState` tradeoff for S0-S3, full-turn recall flow is target-only, shipped flow is token to loop(thread) with no recall.
+
 ## Request lifecycle
 
 The echo lifecycle is live and the full tool loop arrives later.
