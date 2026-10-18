@@ -61,7 +61,6 @@ Local runs read `.env`, deployed runs use real environment values.
 | `APP_HOST` | `127.0.0.1` | live | Host for the local HTTP server |
 | `APP_PORT` | `8000` | live | Port for the local HTTP server |
 | `CACHE_TTL_SECONDS` | `60` | live | Memory search cache TTL |
-| `CACHE_MAX_ENTRIES` | `1000` | live | Local cache cap with oldest-first eviction |
 | `VALKEY_HOST` | empty | live | Enables shared cache; empty keeps in-memory fallback |
 | `DEFAULT_LLM_MODEL` | planned | planned | Starting model for the chat node |
 | `DEFAULT_LLM_TEMPERATURE` | planned | planned | Sampling temperature for chat completions |
