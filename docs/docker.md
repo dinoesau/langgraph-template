@@ -6,13 +6,13 @@ This guide covers current use plus the target stack.
 
 ## Status
 
-`ws/docker-compose.yml:1` defines one service today.
+`docker-compose.yml:1` defines one service today.
 That service is postgres on port 5432.
 It has no pgvector extension yet.
 It has no cache or monitoring services yet.
-See `ws/docs/structure.md:69` for the compose role.
-See `ws/pyproject.toml:1` for the uv-only packaging setup.
-See `ws/langgraph.json:1` for the graph and env pointer.
+See `docs/structure.md:69` for the compose role.
+See `pyproject.toml:1` for the uv-only packaging setup.
+See `langgraph.json:1` for the graph and env pointer.
 
 ```mermaid
 graph TB
@@ -71,7 +71,7 @@ docker compose down
 
 Planned shortcuts will wrap env files per stage.
 Those shortcuts do not exist yet.
-They will follow the `ws/Makefile:8` pattern.
+They will follow the `Makefile:8` pattern.
 Example target shape will be `docker-up` and `stack-up`.
 Full stack will add Prometheus plus Grafana in one command.
 
@@ -82,8 +82,8 @@ Keep secrets out of image layers at all times.
 ## Environment files
 
 Local dev uses one `.env` file today.
-See `ws/.env.example:1` for the template.
-`POSTGRES_URI` in `ws/.env.example:5` points at localhost today.
+See `.env.example:1` for the template.
+`POSTGRES_URI` in `.env.example:5` points at localhost today.
 Docker networking will need `db` as host instead of localhost.
 Each deploy stage will get its own env file when stack lands.
 Copy the example file per stage and edit values there.
@@ -100,7 +100,7 @@ cp .env.example .env.production
 ## Volumes and data
 
 Postgres data lives in a named volume.
-See `ws/docker-compose.yml:11` for the volume mount.
+See `docker-compose.yml:11` for the volume mount.
 The volume survives `docker compose down` by default.
 Remove it explicitly only to reset local data.
 Back up production data with managed backups instead.
@@ -108,11 +108,11 @@ Back up production data with managed backups instead.
 ## Monitoring
 
 Metrics and dashboards are planned.
-Prometheus config will live in `ws/prometheus/:1`.
-Grafana files will live in `ws/grafana/:1`.
+Prometheus config will live in `prometheus/:1`.
+Grafana files will live in `grafana/:1`.
 Both paths do not exist yet.
 The app will expose `GET /metrics` for scraping.
-See `ws/docs/observability.md:1` for metric names.
+See `docs/observability.md:1` for metric names.
 Start with postgres only until metrics land.
 
 ## Migrations
@@ -122,7 +122,7 @@ No `alembic/` folder exists yet.
 Migrations will run from the host against compose postgres.
 They will never touch checkpointer tables.
 They will never touch memory vector tables.
-See `ws/docs/structure.md:183` for the migration boundary.
+See `docs/structure.md:192` for the migration boundary.
 
 Planned flow once Alembic exists:
 
@@ -133,9 +133,9 @@ uv run alembic upgrade head
 
 ## What exists today
 
-`ws/docker-compose.yml:1` starts postgres with fixed credentials.
-`ws/Makefile:8` installs with `uv sync`.
-`ws/Makefile:11` runs the dev server.
+`docker-compose.yml:1` starts postgres with fixed credentials.
+`Makefile:8` installs with `uv sync`.
+`Makefile:11` runs the dev server.
 No app image exists yet.
 No Valkey service exists yet.
 No monitoring services exist yet.

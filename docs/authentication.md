@@ -6,11 +6,11 @@ Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
 
-La capa HTTP vive en `ws/src/api/v1/auth.py:1`.
-La configuracion JWT vivira en `ws/src/core/config.py:1`.
-Los modelos ORM viviran en `ws/src/models/:1`.
-Los esquemas Pydantic viviran en `ws/src/schemas/:1`.
-El layout completo esta en `ws/docs/structure.md:39`.
+La capa HTTP vive en `src/api/v1/auth.py:1`.
+La configuracion JWT vivira en `src/core/config.py:1`.
+Los modelos ORM viviran en `src/models/:1`.
+Los esquemas Pydantic viviran en `src/schemas/:1`.
+El layout completo esta en `docs/structure.md:22`.
 Nunca expongas modelos ORM directo en la API.
 
 ## Flujo
@@ -100,15 +100,15 @@ Requiere un token de usuario valido.
 
 ## Configuracion planeada
 
-La clave de firma vivira en `JWT_SECRET_KEY` dentro de `ws/.env.example:1`.
-La expiracion vivira en `JWT_ACCESS_TOKEN_EXPIRE_DAYS` dentro de `ws/src/core/config.py:1`.
+La clave de firma vivira en `JWT_SECRET_KEY` dentro de `.env.example:1`.
+La expiracion vivira en `JWT_ACCESS_TOKEN_EXPIRE_DAYS` dentro de `src/core/config.py:1`.
 Usa un valor largo y aleatorio de al menos 32 caracteres en produccion.
-Nunca publiques el contenido de `ws/.env:1`.
+Nunca publiques el contenido de `.env:1`.
 
 ## Notas de seguridad
 
 Los passwords se guardaran con hash bcrypt y nunca en texto plano.
 Cada JWT incluira un reclamo `jti` para que cada token sea unico.
 Todas las entradas de texto se sanitizaran antes de usarse.
-El registro y el login tendran rate limits contra fuerza bruta en `ws/src/core/limiter.py:1`.
-El rate limit es planeado porque `ws/src/core/limiter.py:1` aun no existe.
+El registro y el login tendran rate limits contra fuerza bruta en `src/core/limiter.py:1`.
+El rate limit es planeado porque `src/core/limiter.py:1` aun no existe.

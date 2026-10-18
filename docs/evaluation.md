@@ -7,10 +7,10 @@ This guide describes how evals will work in this starter.
 ## Status
 
 Unit and integration layouts are already specified.
-See `ws/docs/structure.md:195` for the test and eval contract.
+See `docs/structure.md:201` for the test and eval contract.
 Traces will be the input for scoring.
 Reports will be plain JSON files on disk.
-The runner path will be `ws/evals/eval_runner.py:1`.
+The runner path will be `evals/eval_runner.py:1`.
 That path does not exist yet.
 
 ## Overview
@@ -32,9 +32,9 @@ flowchart LR
 
 Evals will run on demand with uv.
 They will never run as part of unit tests by default.
-Use the planned runner once `ws/evals/eval_runner.py:1` exists.
+Use the planned runner once `evals/eval_runner.py:1` exists.
 
-Planned commands once `ws/evals/eval_runner.py:1` exists:
+Planned commands once `evals/eval_runner.py:1` exists:
 
 ```bash
 make install
@@ -60,7 +60,7 @@ These five metrics are the planned default set.
 | toxicity | Response avoided harmful content |
 
 Each metric will have one prompt file.
-Prompts will live under `ws/evals/metrics/prompts/:1`.
+Prompts will live under `evals/metrics/prompts/:1`.
 That folder is planned and does not exist yet.
 
 ## Adding a custom metric
@@ -83,7 +83,7 @@ Return fail when the property is missing.
 
 ## Report format
 
-Reports will be saved under `ws/evals/reports/:1`.
+Reports will be saved under `evals/reports/:1`.
 That folder is planned and does not exist yet.
 Each file will use a timestamped JSON name.
 The summary will show totals and success rate.
@@ -111,7 +111,7 @@ The judge will use its own model setting.
 This will allow a cheaper model than the agent default.
 Configure it with env vars only.
 Do not hardcode keys or model names in code.
-See `ws/.env.example:1` for the pattern to follow.
+See `.env.example:1` for the pattern to follow.
 
 Planned vars:
 
@@ -124,9 +124,9 @@ The key will default to `OPENAI_API_KEY` when empty.
 
 ## What exists today
 
-`ws/Makefile:14` runs unit tests with uv.
-`ws/Makefile:17` runs integration tests with uv.
-`ws/pyproject.toml:29` sets `tests` as the test path.
+`Makefile:14` runs unit tests with uv.
+`Makefile:17` runs integration tests with uv.
+`pyproject.toml:34` sets `tests` as the test path.
 No eval runner exists yet.
 No metric prompts exist yet.
 No report folder exists yet.
@@ -137,4 +137,4 @@ Add `evals/eval_runner.py` for fetch, score, and report steps.
 Add `evals/metrics/prompts/` with the five default metrics.
 Add `evals/reports/` to output ignored JSON reports.
 Turn each production failure into one new eval case.
-Link traces from `ws/docs/observability.md:1` as eval input.
+Link traces from `docs/observability.md:1` as eval input.

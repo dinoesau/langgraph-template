@@ -6,18 +6,18 @@ Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
 
-El registry vivira en `ws/src/services/llm/registry.py:1`.
-La logica de llamada vivira en `ws/src/services/llm/service.py:1`.
-El layout de servicios esta en `ws/docs/structure.md:51`.
-El modelo por contexto se declara en `ws/src/agent/configuration.py:1`.
-Las claves de proveedor estan en `ws/.env.example:1`.
+El registry vivira en `src/services/llm/registry.py:1`.
+La logica de llamada vivira en `src/services/llm/service.py:1`.
+El layout de servicios esta en `docs/structure.md:177`.
+El modelo por contexto se declara en `src/agent/configuration.py:1`.
+Las claves de proveedor estan en `.env.example:1`.
 El codigo del agente llamara a `llm_service.call(messages)` y el servicio hara el resto.
-`messages` viene de `GraphState` en `ws/src/agent/state.py:1` que usa `MessagesState` con lista pequena `docs`.
+`messages` viene de `GraphState` en `src/agent/state.py:1` que usa `MessagesState` con lista pequena `docs`.
 
 ## Registry planeado
 
-Los modelos se definiran en orden de preferencia en `ws/src/services/llm/registry.py:1`.
-El modelo inicial se elegira con `DEFAULT_LLM_MODEL` en `ws/src/core/config.py:1`.
+Los modelos se definiran en orden de preferencia en `src/services/llm/registry.py:1`.
+El modelo inicial se elegira con `DEFAULT_LLM_MODEL` en `src/core/config.py:1`.
 Esa variable aun no existe y esta planeada.
 Para agregar o cambiar modelos edita la lista del registry.
 
@@ -27,7 +27,7 @@ Para agregar o cambiar modelos edita la lista del registry.
 | `fallback-anthropic` | Anthropic | First fallback, uses `ANTHROPIC_API_KEY` |
 | `fallback-google` | Google | Second fallback, uses `GOOGLE_API_KEY` |
 
-Las claves ya existen en `ws/.env.example:1`.
+Las claves ya existen en `.env.example:1`.
 El orden de la lista define el orden del fallback.
 El nombre elegido en `DEFAULT_LLM_MODEL` define por donde empieza el ciclo.
 
@@ -68,13 +68,13 @@ Si ningun modelo responde el servicio lanzara `RuntimeError`.
 ## Tools
 
 Las tools se registraran una vez al arrancar con `llm_service.bind_tools(tools)`.
-Las tools del agente viviran en `ws/src/agent/tools/:1` segun `ws/docs/structure.md:142`.
-Son `get_availability`, `book_appointment` y `get_order_status` desde `ws/src/agent/tools/booking.py:1`.
+Las tools del agente viviran en `src/agent/tools/:1` segun `docs/structure.md:150`.
+Son `get_availability`, `book_appointment` y `get_order_status` desde `src/agent/tools/booking.py:1`.
 Al cambiar de modelo en un fallback las tools se reasociaran al modelo nuevo.
-Ese reasociado sera automatico dentro de `ws/src/services/llm/service.py:1`.
-El grafo se construye con `make_the_agent(checkpointer)` con `AsyncPostgresSaver` por `thread_id` segun `ws/docs/structure.md:132`.
+Ese reasociado sera automatico dentro de `src/services/llm/service.py:1`.
+El grafo se construye con `make_the_agent(checkpointer)` con `AsyncPostgresSaver` por `thread_id` segun `docs/structure.md:140`.
 Las tablas `checkpoints`, `checkpoint_blobs` y `checkpoint_writes` las gestiona LangGraph y no Alembic.
-La memoria de largo plazo vive en `ws/src/services/memory.py:1` y no cambia el fallback.
+La memoria de largo plazo vive en `src/services/memory.py:1` y no cambia el fallback.
 
 ## Structured output
 
@@ -96,9 +96,9 @@ Asi los reintentos y el fallback funcionan sin codigo extra en el agente.
 
 ## Agregar un modelo nuevo
 
-Agrega la entrada en la lista de `ws/src/services/llm/registry.py:1`.
+Agrega la entrada en la lista de `src/services/llm/registry.py:1`.
 La posicion en la lista define cuando entra en el fallback.
-Usa la API key del proveedor desde `ws/src/core/config.py:1`.
+Usa la API key del proveedor desde `src/core/config.py:1`.
 
 ```python
 {
@@ -111,4 +111,4 @@ Usa la API key del proveedor desde `ws/src/core/config.py:1`.
 ```
 
 Verifica el cambio con `uv run pytest`.
-Corre el lint con `uv run ruff check src/` segun `ws/Makefile:23`.
+Corre el lint con `uv run ruff check src/` segun `Makefile:23`.

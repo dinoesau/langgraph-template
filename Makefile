@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all install dev test tests integration_tests lint lint_package lint_tests format spell_check spell_fix help
+.PHONY: all install dev test tests integration_tests lint lint_package lint_tests format spell_check spell_fix check_mermaid help
 
 TEST_FILE ?= tests/unit_tests/
 
@@ -41,6 +41,9 @@ spell_check:
 spell_fix:
 	uv run codespell --toml pyproject.toml --write-changes
 
+check_mermaid:
+	bash scripts/check-mermaid.sh $(PATHS)
+
 help:
 	@echo "Targets:"
 	@echo "  all               - default, muestra esta ayuda"
@@ -54,3 +57,4 @@ help:
 	@echo "  format            - ruff format + fix de imports (reglas I)"
 	@echo "  spell_check       - codespell (solo reporta)"
 	@echo "  spell_fix         - codespell con --write-changes"
+	@echo "  check_mermaid [PATHS=...] - compila diagramas mermaid dados o los del repo (necesita npx)"
