@@ -4,11 +4,12 @@ Nodes read recall through ``get_store`` with the shared namespace from
 ``core.memory``, so this adapter never leaks into ``src/agent``. Writes run
 after the reply through the HTTP background writer; failures are logged
 and ignored so chat stays correct when memory degrades. Matching stays
-keyword-grade until a store index with real embeddings lands.
+keyword-grade until a store index with real embeddings lands. Row keys are
+content hashes so repeating a turn overwrites instead of growing the store.
 """
 
+import hashlib
 import logging
-import uuid
 
 from langchain_core.messages import BaseMessage
 from langgraph.store.base import BaseStore
@@ -42,6 +43,11 @@ def extract_memories(messages: list[BaseMessage]) -> list[str]:
     return list(reversed(kept))
 
 
+def row_key(text: str) -> str:
+    """Return the content hash so repeats overwrite instead of duplicating."""
+    return hashlib.sha256(" ".join(text.strip().lower().split()).encode()).hexdigest()
+
+
 async def persist_turn(store: BaseStore, user_id: str, messages: list[BaseMessage]) -> None:
     """Extract and save memories; failures are logged and ignored."""
     clean_user = user_id.strip()
@@ -52,6 +58,6 @@ async def persist_turn(store: BaseStore, user_id: str, messages: list[BaseMessag
         return
     try:
         for text in texts:
-            await store.aput(memory_namespace(clean_user), uuid.uuid4().hex, {"text": text})
+            await store.aput(memory_namespace(clean_user), row_key(text), {"text": text})
     except Exception as exc:  # noqa: BLE001 - write miss keeps reply correct
         logger.warning("memory store degraded: %s", exc)

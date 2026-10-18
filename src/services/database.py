@@ -79,13 +79,16 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     settings = get_settings()
     postgres_uri = normalize_postgres_uri(settings.postgres_uri)
-    cache = build_cache(settings.valkey_host)
+    cache = build_cache(settings.valkey_host, max_entries=settings.cache_max_entries)
     app.state.recall_cache = cache
     if not postgres_uri:
         store: BaseStore = InMemoryStore()
         app.state.agent_store = store
         app.state.agent_graph = build_loop(None, store, cache, settings.cache_ttl_seconds)
-        yield
+        try:
+            yield
+        finally:
+            await cache.aclose()
         return
     async with AsyncPostgresSaver.from_conn_string(postgres_uri) as saver:
         await saver.setup()
@@ -95,4 +98,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await pg_store.setup()
             app.state.agent_store = pg_store
             app.state.agent_graph = build_loop(saver, pg_store, cache, settings.cache_ttl_seconds)
-            yield
+            try:
+                yield
+            finally:
+                await cache.aclose()

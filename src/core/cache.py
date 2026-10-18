@@ -51,9 +51,14 @@ class DualCacheBackend(SyncCacheBackend, AsyncCacheBackend, Protocol):
 class InMemoryTTLCache:
     """Single-instance TTL map guarded by one lock for both paths."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_entries: int = 1000) -> None:
         self._values: dict[str, tuple[str, float]] = {}
         self._lock = threading.Lock()
+        self._max_entries = max(1, max_entries)
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._values)
 
     def get_sync(self, key: str) -> str | None:
         with self._lock:
@@ -68,7 +73,10 @@ class InMemoryTTLCache:
 
     def set_sync(self, key: str, value: str, ttl: int) -> None:
         with self._lock:
+            self._values.pop(key, None)
             self._values[key] = (value, time.monotonic() + max(1, ttl))
+            while len(self._values) > self._max_entries:
+                self._values.pop(next(iter(self._values)))
 
     async def get(self, key: str) -> str | None:
         return self.get_sync(key)
@@ -113,6 +121,26 @@ class ValkeyCache:
 
     def set_sync(self, key: str, value: str, ttl: int) -> None:
         self._sync_client_or_raise().set(key, value, ex=max(1, ttl))
+
+    def close_sync(self) -> None:
+        """Close the sync client if one was created; safe to call twice."""
+        client, self._sync_client = self._sync_client, None
+        if client is None:
+            return
+        try:
+            client.close()
+        except Exception:  # noqa: BLE001 - shutdown must not raise
+            logger.debug("valkey sync close failed")
+
+    async def aclose(self) -> None:
+        """Close the async client if one was created; safe to call twice."""
+        client, self._async_client = self._async_client, None
+        if client is None:
+            return
+        try:
+            await client.aclose()
+        except Exception:  # noqa: BLE001 - shutdown must not raise
+            logger.debug("valkey async close failed")
 
     async def get(self, key: str) -> str | None:
         client = await self._async_client_or_raise()
@@ -171,10 +199,25 @@ class RecallCache:
                 logger.debug("primary cache set failed, using fallback")
         await self._fallback.set(key, value, ttl)
 
+    def close_sync(self) -> None:
+        """Close the shared front; safe with fallback-only fronts."""
+        primary = self._primary
+        closer = getattr(primary, "close_sync", None)
+        if callable(closer):
+            closer()
 
-def build_cache(host: str) -> RecallCache:
-    """Return a cache front with its own fallback; empty host skips Valkey."""
+    async def aclose(self) -> None:
+        """Close the shared front; safe with fallback-only fronts."""
+        primary = self._primary
+        closer = getattr(primary, "aclose", None)
+        if callable(closer):
+            await closer()
+
+
+def build_cache(host: str, max_entries: int = 1000) -> RecallCache:
+    """Return a cache front with its own bounded fallback; empty host skips Valkey."""
     clean = host.strip()
+    fallback = InMemoryTTLCache(max_entries=max_entries)
     if not clean:
-        return RecallCache(primary=None, fallback=InMemoryTTLCache())
-    return RecallCache(primary=ValkeyCache(host=clean), fallback=InMemoryTTLCache())
+        return RecallCache(primary=None, fallback=fallback)
+    return RecallCache(primary=ValkeyCache(host=clean), fallback=fallback)
