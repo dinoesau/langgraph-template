@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="Helvetica, Arial, sans-serif">
 <rect x="4" y="4" width="1232" height="792" rx="18" fill="#f4f4f4" stroke="#333" stroke-width="3"/>
-<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target (S0 to S8 build reference) v2</text>
+<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target (S0 to S8 build reference) v6</text>
 <text x="620" y="64" text-anchor="middle" font-size="12" font-style="italic" fill="#555">verified 2026-10-18: #1 confirmed tradeoff, #2 target-only + wiki 3.3 vs 6.1 conflict</text>
 
 <!-- rings -->
@@ -9,20 +9,21 @@
 <circle cx="300" cy="390" r="135" fill="#ef9e9e" stroke="#333" stroke-width="2.5"/>
 <circle cx="300" cy="390" r="70" fill="#fdf3b0" stroke="#333" stroke-width="2.5"/>
 
-<!-- blue ring labels -->
-<text x="128" y="218" font-size="15" font-weight="bold" fill="#333" transform="rotate(-38 128 218)">Devices</text>
-<text x="430" y="200" font-size="15" font-weight="bold" fill="#333" transform="rotate(38 430 200)">Web</text>
+<!-- blue ring: layer name at top-center, members at mid-sides and bottom -->
+<text x="300" y="165" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Frameworks · Drivers</text>
+<text x="80" y="390" text-anchor="middle" font-size="15" font-weight="bold" fill="#333" transform="rotate(-90 80 390)">Devices</text>
+<text x="520" y="390" text-anchor="middle" font-size="15" font-weight="bold" fill="#333" transform="rotate(90 520 390)">Web</text>
 <text x="128" y="545" font-size="15" font-weight="bold" fill="#333" transform="rotate(38 128 545)">DB</text>
 <text x="432" y="560" font-size="15" font-weight="bold" fill="#333" transform="rotate(-38 432 560)">UI</text>
 <text x="300" y="622" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">External Interfaces</text>
 
-<!-- green ring labels -->
-<text x="300" y="192" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Controllers · Presenters · Gateways</text>
-<text x="300" y="210" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">chat · auth · health · metrics · deps</text>
+<!-- green ring labels: both lines sit inside the green band at top-center (200-255) -->
+<text x="300" y="225" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Controllers · Presenters · Gateways</text>
+<text x="300" y="241" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">chat · auth · health · metrics · deps</text>
 
-<!-- red ring -->
-<text x="300" y="268" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Use Cases</text>
-<text x="300" y="286" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">chat · tools · RAG · router · workers · grader</text>
+<!-- red ring: block centered in the red band (255-320), clear of both strokes -->
+<text x="300" y="285" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Use Cases</text>
+<text x="300" y="300" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">chat · tools · RAG · router · workers · grader</text>
 
 <!-- entities -->
 <text x="300" y="384" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Entities</text>
