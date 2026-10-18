@@ -40,7 +40,7 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls, auth arrives with the auth lifecycle |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Services | `src/services/:1` | Planeado | Owns LLM fallback, memory, and database access |
-| Checkpointer | AsyncPostgresSaver | Planeado | Persists full state per thread for resume and multi-turn memory |
+| Checkpointer | AsyncPostgresSaver | Existe | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
 | Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus settings plus HTTP without model calls |
 
@@ -53,7 +53,7 @@ Each step below runs in order for one user message.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
 3. The `echo` node appends a reply with no model call.
 4. The graph ends the turn with no tool calls.
-5. The checkpointer will persist state per thread in Postgres once it lands.
+5. The checkpointer persists state per thread in Postgres when the lifespan provides it.
 6. The final message returns to Studio.
 
 Auth, rate limits, and background memory writes are planned with `src/api/` and `src/services/`.

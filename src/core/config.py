@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     app_host: str = "127.0.0.1"
     app_port: int = Field(default=8000, ge=1, le=65535)
+    # Empty keeps the loop ephemeral; set POSTGRES_URI to persist threads.
+    postgres_uri: str = ""
 
 
 @lru_cache
