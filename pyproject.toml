@@ -8,12 +8,16 @@ dependencies = [
     "langgraph>=0.6",
     "langchain-core>=0.3",
     "python-dotenv>=1.0",
+    "fastapi>=0.143.3",
+    "uvicorn>=0.54.0",
+    "pydantic-settings>=2.16.0",
 ]
 
 [dependency-groups]
 dev = [
     "codespell>=2.4.3",
-    "langgraph-cli>=0.3",
+    "httpx>=0.28.1",
+    "langgraph-cli[inmem]>=0.3",
     "mypy>=2.4.0",
     "pytest>=8.0",
     "ruff>=0.8",
@@ -28,10 +32,17 @@ packages = ["src/agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+mypy_path = "src"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.codespell]
+ignore-words = ".codespellignore"
 
 [tool.uv]
 package = true

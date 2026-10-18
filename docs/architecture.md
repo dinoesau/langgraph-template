@@ -1,7 +1,7 @@
 # Architecture
 
 This doc shows how the starter fits together today and where it grows next.
-Only `src/agent/__init__.py:1` exists and every other block below is marked as planned.
+An echo loop plus HTTP chat are live, the remaining blocks are marked as planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -9,18 +9,19 @@ The layout follows the spec in `docs/structure.md:1`.
 ```mermaid
 graph TB
     Studio["Studio (browser)"] --> Dev["Dev server"]
-    Dev --> Graph["Graph (planeado)"]
+    Dev --> Graph["Graph (echo loop)"]
+    Graph --> Echo["echo node"]
     Graph --> Chat["chat node (planeado)"]
     Graph --> ToolCall["tool_call node (planeado)"]
     Chat --> LLM["LLM provider"]
     ToolCall --> Tools["tools (planeado)"]
     Graph <--> Ckpt["Checkpointer (planeado)"]
     Ckpt --> PG[("PostgreSQL (opcional)")]
-    Graph --> API["HTTP API (planeado)"]
-    Cfg["Config (planeado)"] -.-> Graph
+    Graph --> API["HTTP API (skeleton)"]
+    Cfg["Config (live)"] -.-> Graph
 ```
 
-Studio is the local client until the HTTP API exists.
+Studio is the local client and the HTTP skeleton serves the same loop.
 The dev server loads the `agent` graph declared in `langgraph.json:1`.
 Postgres is optional and only stores checkpoints once the checkpointer lands.
 
@@ -29,54 +30,55 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | Component | Path | Status | Responsibility |
 | --- | --- | --- | --- |
 | Deploy contract | `langgraph.json:1` | Existe | Maps the `agent` name to the graph variable and points env to `.env` |
-| Package state | `src/agent/state.py:1` | Planeado | Defines `GraphState` as the single source of truth |
-| Graph wiring | `src/agent/graph.py:1` | Planeado | Builds the `chat` to `tool_call` loop and exports `graph` |
+| Package state | `src/agent/state.py:1` | Existe | Defines `GraphState` as the single source of truth |
+| Graph wiring | `src/agent/graph.py:1` | Existe | Echo loop exports `graph`, `chat` to `tool_call` arrives with the tool-calling loop |
 | Nodes | `src/agent/nodes.py:1` | Planeado | Runs LLM and tool calls and returns partial state updates |
 | Tools | `src/agent/tools/:1` | Planeado | Holds one capability module per file behind a shared list |
 | Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
-| HTTP API | `src/api/v1/:1` | Planeado | Translates HTTP into graph invoke or stream calls |
-| Settings | `src/core/config.py:1` | Planeado | Loads typed settings from env vars |
+| HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls, auth arrives with the auth lifecycle |
+| Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Services | `src/services/:1` | Planeado | Owns LLM fallback, memory, and database access |
 | Checkpointer | AsyncPostgresSaver | Planeado | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs optional local Postgres on port 5432 |
-| Tests | `tests/unit_tests/:1` | Existe | Covers nodes, routes, and tools without model calls |
+| Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus settings plus HTTP without model calls |
 
 ## Request lifecycle
 
-The full lifecycle is planned until `src/agent/graph.py:1` exists.
+The echo lifecycle is live and the full tool loop arrives later.
 Each step below runs in order for one user message.
 
 1. Studio sends a user message to the dev server.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
-3. The `chat` node calls the LLM with the current state.
-4. The graph routes to `tool_call` when the reply contains tool calls.
-5. The checkpointer persists state per thread in Postgres.
+3. The `echo` node appends a reply with no model call.
+4. The graph ends the turn with no tool calls.
+5. The checkpointer will persist state per thread in Postgres once it lands.
 6. The final message returns to Studio.
 
 Auth, rate limits, and background memory writes are planned with `src/api/` and `src/services/`.
 
 ## Agent graph
 
-The planned agent is a two-node loop.
+The repo ships a one-node echo loop and the two-node loop below arrives with tool calling.
 
 ```mermaid
 graph LR
-    START --> chat
-    chat -->|tool calls present| tool_call
-    tool_call --> chat
-    chat -->|no tool calls| END
+    START --> echo
+    echo --> END
+    chat["chat (planeado)"]
+    tool_call["tool_call (planeado)"]
 ```
 
-The `chat` node answers or requests tool calls.
-The `tool_call` node runs tools concurrently and feeds results back to `chat`.
+The `echo` node answers with the last human text and no model call.
+The `chat` node answers or requests tool calls once the tool-calling loop exists.
+The `tool_call` node runs tools concurrently and feeds results back to `chat` once it exists.
 The loop ends when the reply carries no tool calls.
 
 ## Growth path
 
 Start with flat files in `src/agent/` per `docs/structure.md:5`.
-Add `src/api/` only when shipping HTTP to users.
-Add `src/core/` and `src/services/` only for shared concerns like config or memory.
+The repo includes `src/api/` with the HTTP skeleton and `src/core/` with settings plus middleware.
+Add `src/services/` only for shared concerns like LLM fallback or memory.
 Keep the checkpointer injected by factory and never hardcode it in the graph module.
 Build the five agent specs in `docs/examples.md:1` in order and router last.

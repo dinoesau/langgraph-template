@@ -136,6 +136,7 @@ This file builds the two-node loop `chat -> tool_call -> chat`.
 The `chat` node returns a `Command` routing to `tool_call` or `END`.
 `AsyncPostgresSaver` persists full state per `thread_id` for resume and multi-turn memory.
 Export a `graph` variable for `langgraph.json`.
+The loop ships as an echo loop with no models, the `chat` to `tool_call` loop arrives with tool calling.
 Use a `make_the_agent(checkpointer)` factory when the server injects persistence.
 Do not import FastAPI or DB code here.
 
@@ -163,14 +164,14 @@ Wire with `add_conditional_edges`.
 ### `src/api/v1/`
 
 This layer translates HTTP to `graph.invoke` or `graph.stream`.
-It owns JWT auth, session scoping, and request schemas.
+It owns request schemas plus health plus chat, auth and session scoping arrive with the auth lifecycle.
 It never defines nodes, edges, or prompts.
 
 ### `src/core/`
 
-`config.py` loads settings from env.
+`config.py` loads typed settings from env with documented defaults.
 `cache.py` fronts Valkey/Redis with in-memory fallback.
-`middleware.py` adds metrics, logging context, and profiling.
+`middleware.py` assigns request ids and logs structured JSON, metrics and profiling arrive with observability.
 `limiter.py` enforces rate limits.
 
 ### `src/services/`
@@ -199,7 +200,7 @@ Log structured JSON with request, session, and user context on every line.
 
 ### `tests/` and `evals/`
 
-Unit test nodes, routes, and tools with fake models and fixed state.
+Unit test the loop plus settings plus HTTP with fixed state and no network.
 Integration test `graph.invoke` with real models, run on purpose.
 Score trajectories (intent, tools called, approvals), not just final answers.
 Turn every production failure into a new eval case.

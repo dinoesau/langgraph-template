@@ -49,25 +49,27 @@ Start the service when you need persistence.
 docker compose up -d postgres
 ```
 
-## Planned settings
+## Settings
 
-These names are reserved for `src/core/config.py:1` and have no effect today.
-Do not rely on them until the settings module ships.
+`src/core/config.py:1` loads typed settings with documented defaults.
+Local runs read `.env`, deployed runs use real environment values.
 
 | Variable | Default | Status | Description |
 | --- | --- | --- | --- |
-| `APP_ENV` | planeado | planeado | Selects development, staging, or production behavior |
-| `LOG_LEVEL` | planeado | planeado | Controls console verbosity for local runs |
-| `DEFAULT_LLM_MODEL` | planeado | planeado | Starting model for the chat node |
-| `DEFAULT_LLM_TEMPERATURE` | planeado | planeado | Sampling temperature for chat completions |
-| `MAX_TOKENS` | planeado | planeado | Cap per LLM response |
-| `JWT_SECRET_KEY` | planeado | planeado | Signs auth tokens once `src/api/` exists |
-| `LANGFUSE_TRACING_ENABLED` | planeado | planeado | Disables tracing during development when false |
-| `VALKEY_HOST` | planeado | planeado | Enables shared cache once the cache service exists |
+| `APP_ENV` | `development` | live | Selects development, staging, or production behavior |
+| `LOG_LEVEL` | `INFO` | live | Controls console verbosity for local runs |
+| `APP_HOST` | `127.0.0.1` | live | Host for the local HTTP server |
+| `APP_PORT` | `8000` | live | Port for the local HTTP server |
+| `DEFAULT_LLM_MODEL` | planned | planned | Starting model for the chat node |
+| `DEFAULT_LLM_TEMPERATURE` | planned | planned | Sampling temperature for chat completions |
+| `MAX_TOKENS` | planned | planned | Cap per LLM response |
+| `JWT_SECRET_KEY` | planned | planned | Signs auth tokens once the auth layer exists |
+| `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
+| `VALKEY_HOST` | planned | planned | Enables shared cache once the cache service exists |
 
 ## Validation
 
 Run `uv run pytest` to confirm the toolchain.
 Run `docker compose ps` to confirm Postgres.
-Open the Studio URL to confirm the graph once `src/agent/graph.py:1` exists.
+Open the Studio URL to confirm the graph loads.
 Reread `docs/getting-started.md:1` when any step fails.
