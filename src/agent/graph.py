@@ -36,7 +36,11 @@ builder.add_edge("echo", END)
 def make_the_agent(
     checkpointer: BaseCheckpointSaver[str] | None = None,
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
-    """Compile the echo loop, persisting per thread only when a checkpointer is given."""
+    """Compile the echo loop, persisting per thread only when a checkpointer is given.
+
+    The lifespan async context manager owns the checkpointer and injects it here,
+    so the loop never imports storage directly.
+    """
     return builder.compile(checkpointer=checkpointer)
 
 
