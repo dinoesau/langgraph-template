@@ -15,12 +15,6 @@
 <text x="423" y="463" font-size="15" font-weight="bold" fill="#333" transform="rotate(-38 423 463)">UI</text>
 <text x="280" y="512" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">External Interfaces</text>
 
-<!-- inward arrows live outside the circles to avoid label collisions -->
-<g stroke="#333" stroke-width="2" fill="none" marker-end="url(#ah)">
-<line x1="230" y1="586" x2="270" y2="586"/>
-</g>
-<text x="30" y="590" font-size="11" font-style="italic" fill="#333">dependencies point inward</text>
-
 <!-- green ring labels + modules -->
 <text x="280" y="152" text-anchor="middle" font-size="16" font-weight="bold" fill="#333">Controllers</text>
 <text x="280" y="170" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">chat · health · deps</text>
@@ -37,33 +31,36 @@
 <text x="280" y="304" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Entities</text>
 <text x="280" y="322" text-anchor="middle" font-size="11" font-family="monospace" fill="#333">GraphState · User · Session</text>
 
+<!-- inward arrowhead marker -->
 <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" stroke="#333" fill="none"/></marker></defs>
+
+<!-- inward arrows, outside the circles -->
+<g stroke="#333" stroke-width="2" fill="none" marker-end="url(#ah)">
+<line x1="150" y1="586" x2="190" y2="586"/>
+<line x1="330" y1="586" x2="370" y2="586"/>
+</g>
+<text x="30" y="590" font-size="11" font-style="italic" fill="#333">dependencies point inward</text>
 
 <!-- right panel -->
 <g font-size="12.5">
-<text x="560" y="90" font-size="17" font-weight="bold" fill="#333">Our modules per ring</text>
-<rect x="560" y="104" width="14" height="14" fill="#fdf3b0" stroke="#333"/><text x="582" y="116" fill="#333">Entities: agent/state.py, models/user.py, models/session.py</text>
-<rect x="560" y="128" width="14" height="14" fill="#ef9e9e" stroke="#333"/><text x="582" y="140" fill="#333">Use Cases: agent/graph.py (factory + echo node)</text>
-<rect x="560" y="152" width="14" height="14" fill="#93d193" stroke="#333"/><text x="582" y="164" fill="#333">Adapters: api/v1/*, api/deps.py (DI),</text>
-<text x="582" y="180" font-size="12" fill="#333">services/database.py, alembic/env.py</text>
-<rect x="560" y="194" width="14" height="14" fill="#a9cfe8" stroke="#333"/><text x="582" y="206" fill="#333">Drivers: FastAPI, Postgres, Alembic, LangGraph</text>
-<text x="560" y="224" font-size="11" font-style="italic" fill="#555">api/app.py = composition root (wires everything, standard exception)</text>
+<text x="560" y="110" font-size="17" font-weight="bold" fill="#333">Modules per ring</text>
+<rect x="560" y="124" width="14" height="14" fill="#fdf3b0" stroke="#333"/><text x="582" y="136" fill="#333">Entities: agent/state.py, models/user.py,</text>
+<text x="582" y="152" fill="#333">models/session.py</text>
+<rect x="560" y="164" width="14" height="14" fill="#ef9e9e" stroke="#333"/><text x="582" y="176" fill="#333">Use Cases: agent/graph.py (factory + echo)</text>
+<rect x="560" y="188" width="14" height="14" fill="#93d193" stroke="#333"/><text x="582" y="200" fill="#333">Adapters: api/v1/*, api/deps.py,</text>
+<text x="582" y="216" fill="#333">services/database.py, alembic/env.py</text>
+<rect x="560" y="228" width="14" height="14" fill="#a9cfe8" stroke="#333"/><text x="582" y="240" fill="#333">Drivers: FastAPI, uvicorn, Postgres + saver,</text>
+<text x="582" y="256" fill="#333">Alembic + SQLAlchemy, LangGraph engine</text>
+<text x="560" y="278" font-size="11" font-style="italic" fill="#555">api/app.py is the composition root: it wires the rings.</text>
 
-<text x="560" y="256" font-size="17" font-weight="bold" fill="#333">Dependency check</text>
-<text x="560" y="278" fill="#1a7a1a">✓ services/database → agent/graph (inward)</text>
-<text x="560" y="300" fill="#1a7a1a">✓ chat → agent/graph (inward)</text>
-<text x="560" y="322" fill="#1a7a1a">✓ core (GraphState, models) knows no HTTP, no Postgres</text>
-<text x="560" y="344" fill="#b26a00">✓ chat → api/deps → services (Depends DI seam)</text>
-<text x="560" y="370" font-size="11.5" fill="#555">Lateral resolved: chat no longer imports services.</text>
-<text x="560" y="386" font-size="11.5" fill="#555">S4/S6 readers reuse api/deps instead of new laterals.</text>
+<text x="560" y="312" font-size="17" font-weight="bold" fill="#333">Dependencies</text>
+<text x="560" y="334" fill="#333">services/database → agent/graph</text>
+<text x="560" y="356" fill="#333">api/v1/chat → api/deps → services/database</text>
+<text x="560" y="378" fill="#333">api/v1/chat → agent/graph</text>
+<text x="560" y="400" fill="#333">agent/graph, models → frameworks only</text>
 
-<text x="560" y="418" font-size="17" font-weight="bold" fill="#333">Request flow (controller pattern)</text>
-<text x="560" y="440" font-family="monospace" font-size="12" fill="#333">chat → Depends(deps) → gateway → echo</text>
-<text x="560" y="460" font-family="monospace" font-size="12" fill="#333">→ ChatResponse(Presenter) → HTTP</text>
-
-<text x="560" y="492" font-size="17" font-weight="bold" fill="#333">Verdict</text>
-<text x="560" y="514" fill="#1a7a1a" font-weight="bold">Compliant: DI seam replaces the lateral,</text>
-<text x="560" y="534" fill="#1a7a1a" font-weight="bold">core pure, root composing.</text>
-<text x="560" y="562" font-size="12" fill="#555">No lateral imports remain in the HTTP layer.</text>
+<text x="560" y="434" font-size="17" font-weight="bold" fill="#333">Request flow</text>
+<text x="560" y="456" font-family="monospace" font-size="12" fill="#333">POST /chat → chat → get_request_graph</text>
+<text x="560" y="476" font-family="monospace" font-size="12" fill="#333">→ loop turn → ChatResponse → HTTP</text>
 </g>
 </svg>
