@@ -17,7 +17,7 @@ See `src/agent/graph.py:1` for the wiring point.
 See `docs/structure.md:180` for the `src/services/memory.py:1` role.
 See `docs/structure.md:173` for the `src/core/cache.py:1` role.
 Semantic memory and cache exist with Postgres plus Valkey in compose and in-memory fallbacks in code.
-Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until S4 session tokens replace it; production ignores the header so it cannot spoof recall.
+Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until S4 session tokens replace it; production ignores the header so it cannot spoof recall, and overlong ids degrade to no recall instead of colliding.
 Today `docker-compose.yml:1` starts pgvector plus Valkey.
 
 ## Overview
