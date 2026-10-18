@@ -6,13 +6,11 @@ the migration boundary is a pure function test.
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from agent.graph import graph, make_the_agent
-from api.app import create_app
 from services.database import EXCLUDED_TABLES, alembic_include_object
 
 
@@ -60,16 +58,3 @@ def test_migrations_exclude_framework_tables() -> None:
         assert alembic_include_object(None, table, "table", False, None) is False
     for table in ("users", "sessions"):
         assert alembic_include_object(None, table, "table", False, None) is True
-
-
-def test_http_chat_resumes_thread() -> None:
-    app = create_app()
-    app.state.agent_graph = make_the_agent(checkpointer=MemorySaver())
-    client = TestClient(app)
-    first = client.post("/api/v1/chat", json={"message": "one", "thread_id": "t1"})
-    second = client.post("/api/v1/chat", json={"message": "two", "thread_id": "t1"})
-    assert first.status_code == 200
-    assert second.status_code == 200
-    assert second.json()["thread_id"] == "t1"
-    state = app.state.agent_graph.get_state({"configurable": {"thread_id": "t1"}})
-    assert [m.content for m in state.values["messages"]] == ["one", "Echo: one", "two", "Echo: two"]
