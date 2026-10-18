@@ -59,7 +59,7 @@ Dependencies point inward; handlers resolve the loop through the `api/deps` Depe
 
 ![Clean architecture target with all planned modules](clean-architecture-target.svg)
 
-Target is the destination map verified 2026-10-18: `GraphState` keeps the `MessagesState` tradeoff for S0-S3, full-turn recall flow is live on the async path with transitional `X-User-ID`, sync path stays echo-only.
+Target is the destination map verified 2026-10-18: `GraphState` keeps the `MessagesState` tradeoff for S0-S3, recall runs on `invoke` plus `ainvoke` plus `astream` when the lifespan-wired graph serves the turn with transitional `X-User-ID`.
 
 ## Request lifecycle
 
@@ -68,13 +68,13 @@ Each step below runs in order for one user message.
 
 1. Studio sends a user message to the dev server.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
-3. The `echo` node loads per-user recall as `docs` on the async path with no model call.
+3. The `echo` node loads per-user recall as `docs` when a caller id is present, with no model call.
 4. The graph ends the turn with no tool calls.
-5. The checkpointer persists state per thread in Postgres when the lifespan provides it.
-6. Memory extraction plus store runs in the background after the reply without slowing chat.
+5. The checkpointer persists state per thread in Postgres when the lifespan provides it; without Postgres the loop stays ephemeral with in-memory recall.
+6. Memory extraction plus store runs after the reply without slowing the async chat path and drains on shutdown.
 7. The final message returns to Studio.
 
-Auth and rate limits are planned with `src/api/` and `src/services/`; recall uses transitional `X-User-ID` until S4 tokens land.
+Auth and rate limits are planned with `src/api/` and `src/services/`; recall uses transitional `X-User-ID` until S4 tokens land, and production ignores that header.
 
 ## Agent graph
 
