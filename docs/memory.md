@@ -63,6 +63,8 @@ Cache keys look like `memory:{user_id}:{query_hash}`.
 TTL comes from `CACHE_TTL_SECONDS` with a default of 60 seconds.
 Only successful and non-empty results are cached.
 Errors are never cached.
+Writes inside the TTL window may stay invisible until expiry; that staleness is accepted per ADR-005.
+The local map holds at most `CACHE_MAX_ENTRIES` entries with oldest-first eviction.
 
 ## Memory updates
 
