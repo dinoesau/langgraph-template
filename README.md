@@ -4,7 +4,7 @@ This starter gives you a minimal production-minded base for LangGraph agents.
 It keeps the deploy contract small so you can grow the codebase step by step.
 It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
-Most agent features are planned and the current package is almost empty.
+Most agent features are planned and the repo ships an echo loop with HTTP chat.
 
 ## What's included
 
@@ -13,9 +13,9 @@ Most agent features are planned and the current package is almost empty.
 - Commands in `Makefile` wrap `uv sync`, dev server, tests, lint, and format.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
-- Planned graph loop with `chat` plus tools plus checkpointer is not implemented yet.
-- Planned services for LLM fallback, memory, database, auth, and observability are not implemented yet.
-- Tests in `tests/unit_tests/` hold placeholders without model calls.
+- Echo loop with `graph` plus `state` answers greetings without models, tools arrive with the tool-calling loop.
+- HTTP skeleton with health plus chat plus typed settings is live, LLM fallback plus memory plus database plus auth plus observability are planned.
+- Tests in `tests/unit_tests/` cover the loop plus settings plus HTTP without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
 ## Quickstart
@@ -28,11 +28,13 @@ Copy the example env file before the first run.
 cp .env.example .env
 uv sync
 uv run langgraph dev
+uv run uvicorn --app-dir src api.app:app
 uv run pytest
 ```
 
 The dev server entry comes from `langgraph.json:1`.
-The graph module itself is planned and the dev server will fail until it exists.
+The graph module exists as an echo loop and the dev server loads it.
+The HTTP skeleton serves on `:8000` with `GET /api/v1/health` and `POST /api/v1/chat`.
 Use `Makefile` when you prefer short targets for the same uv commands.
 Read `docs/structure.md:1` before adding new files so the layout stays small.
 
@@ -78,7 +80,7 @@ Grow into `src/api/` and `src/services/` only when shipping to users.
 
 **Is this ready to deploy today?**
 No.
-The deploy contract exists but the graph module is still planned.
+The deploy contract maps to an echo loop, production agent features are still planned.
 
 **How do I add the first agent?**
 Follow `docs/structure.md:1` for file roles.

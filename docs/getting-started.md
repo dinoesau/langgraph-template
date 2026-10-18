@@ -2,7 +2,7 @@
 
 This guide takes a fresh checkout to the first graph answer.
 Every step uses uv only.
-The full graph is still planned and the setup below already works.
+The echo loop plus HTTP skeleton are live and the setup below already works.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ uv sync
 ```
 
 This matches the `install` target in `Makefile:8`.
-Run the placeholder tests to confirm the toolchain.
+Run the unit tests to confirm the toolchain.
 
 ```bash
 uv run pytest
@@ -58,8 +58,8 @@ This matches the `dev` target in `Makefile:11`.
 
 ## First call
 
-The graph module `src/agent/graph.py:1` is still planned.
-Only `src/agent/__init__.py:1` exists today.
+The graph module `src/agent/graph.py:1` ships an echo loop with no models.
+It answers greetings with no provider keys and the tool loop arrives later.
 Once the module exports `graph`, the dev server exposes Studio on the printed URL.
 Open that Studio URL in the browser.
 Select the `agent` graph declared in `langgraph.json:1`.
@@ -76,7 +76,7 @@ Use the ReAct prompt in `docs/examples.md:8` for the first tool loop.
 
 ## Troubleshooting
 
-The dev server reports a missing graph while `src/agent/graph.py:1` stays planned.
+The dev server fails to load when the graph export drifts from `langgraph.json:1`.
 The database refuses connections when Postgres is down or `POSTGRES_URI` is wrong.
 Check the container with `docker compose ps` against `docker-compose.yml:2`.
 Rerun `uv sync` when imports fail after pulling new changes.
