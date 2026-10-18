@@ -1,8 +1,8 @@
 # Database
 
 Estado: parcial.
-El checkpointer por fabrica, las migraciones con frontera y el schema de app ya existen.
-pgvector y la memoria semantica siguen planeados.
+El checkpointer por fabrica, las migraciones con frontera, el schema de app y la memoria S2b ya existen.
+La extraccion LLM y auth siguen planeados.
 Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
@@ -43,7 +43,7 @@ Session copia el username al crearse para evitar una lectura extra en cada chat.
 Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session en el slice de auth.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
 Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
-La tabla de memoria semantica la gestiona la capa de memoria y tampoco Alembic.
+La tabla de memoria semantica `memory_vectors` la gestiona la capa de memoria y tampoco Alembic.
 
 ## Checkpointer
 
@@ -86,10 +86,9 @@ Aplica la migracion con `uv run alembic upgrade head`.
 ## Postgres y pgvector
 
 El servicio local esta definido en `docker-compose.yml:1`.
-Hoy usa `postgres:15-alpine` sin extension vectorial.
-El cambio a una imagen con pgvector esta planeado.
+Usa `pgvector/pgvector:pg15` con extension vectorial mas Valkey en `6379`.
 La extension se habilitara con `CREATE EXTENSION IF NOT EXISTS vector` antes de migrar.
 Con Docker ese paso sera automatico en el servicio de base de datos.
 En bases externas habilita la extension desde el panel o el editor SQL.
-La memoria semantica de largo plazo usara pgvector y vive en `src/services/memory.py:1`.
-Esa capa aun no existe y tambien esta planeada.
+La memoria semantica de largo plazo usa pgvector y vive en `src/services/memory.py:1`.
+El frente de cache vive en `src/core/cache.py:1` con fallback in-memory.

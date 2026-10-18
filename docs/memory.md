@@ -1,20 +1,21 @@
 # Memory
 
-Long term memory is planned.
-It is not implemented yet.
-This guide describes the target design for this starter.
+Long term memory is live for per-user recall with cache front.
+Extraction is heuristic; LLM extraction arrives with later slices.
+This guide describes the shipped S2b behavior plus the target design.
 
 ## Status
 
 Short term state lives in the graph checkpointer.
 `GraphState` in `src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-Graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `docs/structure.md:140`.
-See `src/agent/graph.py:1` for the planned wiring point.
+Graphs use `make_the_agent(checkpointer, recall_hook, store_hook)` with `AsyncPostgresSaver` per `docs/structure.md:140`.
+Recall is injected as `docs` on the async path; the sync path stays echo-only.
+See `src/agent/graph.py:1` for the wiring point.
 See `docs/structure.md:180` for the `src/services/memory.py:1` role.
 See `docs/structure.md:173` for the `src/core/cache.py:1` role.
-Semantic memory and cache are both marked as planned.
-Today only `src/agent/__init__.py:1` exists in code.
-Today `docker-compose.yml:1` only starts postgres.
+Semantic memory and cache exist with pgvector plus Valkey in compose and in-memory fallbacks in code.
+Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until S4 session tokens replace it.
+Today `docker-compose.yml:1` starts pgvector plus Valkey.
 
 ## Overview
 
@@ -105,16 +106,14 @@ Session scope will still come from `thread_id` in the checkpointer.
 
 ## What exists today
 
-`docker-compose.yml:1` starts postgres on port 5432.
-It has no pgvector extension yet.
-It has no Valkey service yet.
-`pyproject.toml:1` has no vector or memory dependency yet.
+`docker-compose.yml:1` starts pgvector on port 5432 plus Valkey on port 6379.
+`pyproject.toml:1` carries `redis` for the shared cache front.
+Vectors live in `memory_vectors`, excluded from Alembic and owned by the memory layer.
+Embeddings are deterministic hash vectors until `LONG_TERM_MEMORY_EMBEDDER_MODEL` names a real model.
 `langgraph.json:1` only maps the graph and env file.
 
 ## Next steps
 
-Add `src/services/memory.py:1` with search and add functions.
-Add `src/core/cache.py:1` with Valkey plus in-memory fallback.
-Extend `docker-compose.yml:1` with pgvector and Valkey.
-Add env vars to `.env.example:1` for collection and TTL.
-Wire memory search into the chat node in `src/agent/graph.py:1`.
+Replace transitional `X-User-ID` with the S4 session token claim.
+Replace heuristic extraction with LLM extraction once the model registry lands.
+Tune `CACHE_TTL_SECONDS` plus top-k once S6 traces show hit rates.
