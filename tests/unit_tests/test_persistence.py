@@ -6,12 +6,18 @@ the migration boundary is a pure function test.
 
 from pathlib import Path
 
+from fastapi import FastAPI
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 
 from agent.graph import graph, make_the_agent
-from services.database import EXCLUDED_TABLES, alembic_include_object, normalize_postgres_uri
+from services.database import (
+    EXCLUDED_TABLES,
+    alembic_include_object,
+    get_agent_graph,
+    normalize_postgres_uri,
+)
 
 
 def test_ephemeral_graph_stays_stateless() -> None:
@@ -71,3 +77,13 @@ def test_normalize_postgres_uri() -> None:
         normalize_postgres_uri("postgres://postgres:postgres@localhost:5432/postgres")
         == "postgresql://postgres:postgres@localhost:5432/postgres"
     )
+
+
+def test_get_agent_graph_falls_back_without_lifespan() -> None:
+    assert get_agent_graph(FastAPI()) is graph
+
+
+def test_get_agent_graph_returns_attached_graph() -> None:
+    app = FastAPI()
+    app.state.agent_graph = make_the_agent(checkpointer=MemorySaver())
+    assert get_agent_graph(app) is app.state.agent_graph

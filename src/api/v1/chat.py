@@ -3,17 +3,14 @@
 import json
 import uuid
 from collections.abc import AsyncIterator
-from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, field_validator
 
-from agent.graph import graph
-
-AgentGraph = CompiledStateGraph[Any, Any, Any, Any]
+from agent.graph import AgentGraph
+from services.database import get_agent_graph
 
 router = APIRouter(tags=["chat"])
 
@@ -38,11 +35,6 @@ class ChatResponse(BaseModel):
 
     reply: str
     thread_id: str
-
-
-def _resolve_agent(request: Request) -> AgentGraph:
-    """Use the lifespan-persisted loop when present, else the ephemeral module graph."""
-    return getattr(request.app.state, "agent_graph", None) or graph
 
 
 async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str) -> str:
@@ -75,7 +67,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Delegate one turn to the loop and return its reply."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return ChatResponse(
-        reply=await _invoke_loop(_resolve_agent(request), body.message, thread_id),
+        reply=await _invoke_loop(get_agent_graph(request.app), body.message, thread_id),
         thread_id=thread_id,
     )
 
@@ -85,6 +77,6 @@ def chat_stream(request: Request, body: ChatRequest) -> StreamingResponse:
     """Delegate one turn to the loop and stream its reply back."""
     thread_id = body.thread_id or uuid.uuid4().hex
     return StreamingResponse(
-        _stream_loop(_resolve_agent(request), body.message, thread_id),
+        _stream_loop(get_agent_graph(request.app), body.message, thread_id),
         media_type="text/event-stream",
     )
