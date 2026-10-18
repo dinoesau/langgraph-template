@@ -14,14 +14,12 @@ from langgraph.store.base import BaseStore
 
 from agent.state import GraphState
 from core.cache import build_memory_key
+from core.memory import DEFAULT_TOP_K, format_recall, memory_namespace, recall_texts
 
 if TYPE_CHECKING:
     from core.cache import RecallCache
 
 logger = logging.getLogger("agent")
-
-MEMORY_NAMESPACE = "memories"
-DEFAULT_TOP_K = 4
 
 
 def _last_human_text(messages: Sequence[BaseMessage]) -> str:
@@ -43,15 +41,6 @@ def _request_user_id(config: RunnableConfig | None) -> str:
     return raw.strip() if isinstance(raw, str) else ""
 
 
-def _recall_text(hits: list[Any]) -> str:
-    """Render store hits as plain context text for the turn."""
-    texts = [str(item.value.get("text", "")).strip() for item in hits]
-    cleaned = [text for text in texts if text]
-    if not cleaned:
-        return ""
-    return "\n".join(f"- {text}" for text in cleaned)
-
-
 def _recall_sync(
     store: BaseStore, cache: "RecallCache | None", ttl: int, user_id: str, query: str
 ) -> str:
@@ -65,8 +54,8 @@ def _recall_sync(
         if cached:
             return cached
     try:
-        recall = _recall_text(
-            store.search((MEMORY_NAMESPACE, user_id), query=query, limit=DEFAULT_TOP_K)
+        recall = format_recall(
+            recall_texts(store.search(memory_namespace(user_id), query=query, limit=DEFAULT_TOP_K))
         )
     except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
         logger.warning("recall degraded: %s", exc)
@@ -92,8 +81,8 @@ async def _recall_async(
         if cached:
             return cached
     try:
-        hits = await store.asearch((MEMORY_NAMESPACE, user_id), query=query, limit=DEFAULT_TOP_K)
-        recall = _recall_text(hits)
+        hits = await store.asearch(memory_namespace(user_id), query=query, limit=DEFAULT_TOP_K)
+        recall = format_recall(recall_texts(hits))
     except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
         logger.warning("recall degraded: %s", exc)
         return ""

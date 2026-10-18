@@ -1,10 +1,10 @@
-"""Per-user semantic memory: extract plus BaseStore wiring plus the writer.
+"""Per-user semantic memory: extract plus background writer over BaseStore.
 
-Nodes read recall through ``get_store`` with per-user namespaces, so this
-adapter never leaks into ``src/agent``. Writes run after the reply through
-the HTTP background writer; failures are logged and ignored so chat stays
-correct when memory degrades. Matching stays keyword-grade until a store
-index with real embeddings lands.
+Nodes read recall through ``get_store`` with the shared namespace from
+``core.memory``, so this adapter never leaks into ``src/agent``. Writes run
+after the reply through the HTTP background writer; failures are logged
+and ignored so chat stays correct when memory degrades. Matching stays
+keyword-grade until a store index with real embeddings lands.
 """
 
 import logging
@@ -13,16 +13,13 @@ import uuid
 from langchain_core.messages import BaseMessage
 from langgraph.store.base import BaseStore
 
+from core.memory import format_recall, memory_namespace
+
+__all__ = ["extract_memories", "format_recall", "memory_namespace", "persist_turn"]
+
 logger = logging.getLogger("memory")
 
-MEMORY_NAMESPACE = "memories"
-DEFAULT_TOP_K = 4
 MAX_MEMORY_CHARS = 500
-
-
-def memory_namespace(user_id: str) -> tuple[str, str]:
-    """Return the per-user namespace so users never read each other rows."""
-    return (MEMORY_NAMESPACE, user_id.strip())
 
 
 def extract_memories(messages: list[BaseMessage]) -> list[str]:
@@ -43,14 +40,6 @@ def extract_memories(messages: list[BaseMessage]) -> list[str]:
         if len(kept) >= 2:
             break
     return list(reversed(kept))
-
-
-def format_recall(texts: list[str]) -> str:
-    """Render hits as plain context text; empty means inject nothing."""
-    cleaned = [text.strip() for text in texts if text.strip()]
-    if not cleaned:
-        return ""
-    return "\n".join(f"- {text}" for text in cleaned)
 
 
 async def persist_turn(store: BaseStore, user_id: str, messages: list[BaseMessage]) -> None:
