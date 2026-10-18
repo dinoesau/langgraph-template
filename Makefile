@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := all
-.PHONY: all install dev test tests integration_tests lint lint_package lint_tests format spell_check spell_fix check_mermaid help
+.PHONY: all install dev test tests integration_tests lint lint_package lint_tests format spell_check spell_fix check_mermaid db-upgrade db-revision db-downgrade db-history help
 
 TEST_FILE ?= tests/unit_tests/
 
@@ -44,6 +44,18 @@ spell_fix:
 check_mermaid:
 	bash scripts/check-mermaid.sh $(PATHS)
 
+db-upgrade:
+	uv run alembic upgrade head
+
+db-revision:
+	uv run alembic revision --autogenerate -m "$(MSG)"
+
+db-downgrade:
+	uv run alembic downgrade -1
+
+db-history:
+	uv run alembic history
+
 help:
 	@echo "Targets:"
 	@echo "  all               - default, muestra esta ayuda"
@@ -58,3 +70,7 @@ help:
 	@echo "  spell_check       - codespell (solo reporta)"
 	@echo "  spell_fix         - codespell con --write-changes"
 	@echo "  check_mermaid [PATHS=...] - compila diagramas mermaid dados o los del repo (necesita npx)"
+	@echo "  db-upgrade      - aplica migraciones con alembic upgrade head"
+	@echo "  db-revision MSG=... - genera migracion con autogenerate y mensaje MSG"
+	@echo "  db-downgrade    - retrocede una migracion con alembic downgrade -1"
+	@echo "  db-history      - muestra historial con alembic history"

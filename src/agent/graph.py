@@ -1,9 +1,12 @@
 """Echo loop: proves the deploy contract with no model and no storage."""
 
 from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from agent.state import GraphState
 
@@ -28,4 +31,17 @@ builder = StateGraph(GraphState)
 builder.add_node("echo", echo)
 builder.add_edge(START, "echo")
 builder.add_edge("echo", END)
-graph = builder.compile()
+
+
+def make_the_agent(
+    checkpointer: BaseCheckpointSaver[str] | None = None,
+) -> CompiledStateGraph[Any, Any, Any, Any]:
+    """Compile the echo loop, persisting per thread only when a checkpointer is given.
+
+    The lifespan async context manager owns the checkpointer and injects it here,
+    so the loop never imports storage directly.
+    """
+    return builder.compile(checkpointer=checkpointer)
+
+
+graph = make_the_agent()

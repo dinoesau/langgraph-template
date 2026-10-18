@@ -1,19 +1,20 @@
 # Database
 
-Estado: planeado.
-El schema de app, las migraciones y pgvector aun no estan implementados.
+Estado: parcial.
+El checkpointer por fabrica, las migraciones con frontera y el schema de app ya existen.
+pgvector y la memoria semantica siguen planeados.
 Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
 
-Los modelos ORM viviran en `src/models/:1`.
-El acceso a datos vivira en `src/services/database.py:1`.
-Las migraciones viviran en `alembic/:1`.
+Los modelos ORM viven en `src/models/:1`.
+El acceso a datos vive en `src/services/database.py:1`.
+Las migraciones viven en `alembic/:1`.
 La conexion local esta en `docker-compose.yml:1`.
 La URL de conexion esta en `.env.example:5`.
 El layout completo esta en `docs/structure.md:22`.
 
-## Schema planeado
+## Schema
 
 ```mermaid
 erDiagram
@@ -34,42 +35,38 @@ erDiagram
         string username "copied from User at creation"
         datetime created_at
     }
-
-    Thread {
-        string id PK "UUID"
-        datetime created_at
-    }
 ```
 
 User representa una cuenta con email unico.
 Session representa una conversacion y un usuario puede tener muchas.
 Session copia el username al crearse para evitar una lectura extra en cada chat.
-Thread refleja el hilo de checkpoint de LangGraph en el contexto de la app.
+Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session en el slice de auth.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
-Esas tablas son `checkpoints`, `checkpoint_blobs` y `checkpoint_writes`.
+Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
 La tabla de memoria semantica la gestiona la capa de memoria y tampoco Alembic.
 
-## Checkpointer planeado
+## Checkpointer
 
-La persistencia usara `AsyncPostgresSaver` con un hilo por `thread_id`.
-El grafo recibira el checkpointer por fabrica y nunca lo importara directo.
-El patron objetivo es `make_the_agent(checkpointer)` segun `docs/structure.md:140`.
-El checkpointer se proveera como dependencia de lifespan desde `src/services/database.py:1`.
+La persistencia usa `AsyncPostgresSaver` con un hilo por `thread_id`.
+El grafo recibe el checkpointer por fabrica y nunca lo importa directo.
+El patron es `make_the_agent(checkpointer)` segun `docs/structure.md:140`.
+El checkpointer se provee como dependencia de lifespan desde `src/services/database.py:1`.
+Sin `POSTGRES_URI` el loop sigue efimero; con la variable puesta el arranque falla si el store no responde.
 Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.
 `GraphState` en `src/agent/state.py:1` usa `MessagesState` con `messages` mas lista pequena `docs`.
 Las tools `get_availability`, `book_appointment` y `get_order_status` viven en `src/agent/tools/booking.py:1`.
 
-## Migraciones con Alembic planeadas
+## Migraciones con Alembic
 
-Alembic sera dueno del schema de app.
-La app nunca llamara a `create_all()` en el arranque.
+Alembic es dueno del schema de app.
+La app nunca llama a `create_all()` en el arranque.
 Aplica las migraciones con `uv run alembic upgrade head`.
 Genera una migracion con `uv run alembic revision --autogenerate -m "describe el cambio"`.
 Revisa el archivo generado en `alembic/versions/:1` antes de aplicarlo.
 Retrocede una migracion con `uv run alembic downgrade -1`.
 Muestra el historial con `uv run alembic history`.
-Alembic leera la URL desde `.env.example:5` via `src/core/config.py:1`.
-Los atajos de Makefile para migraciones estan planeados porque aun no existen.
+Alembic lee la URL desde `.env.example:5` via `src/core/config.py:1`.
+Los atajos `db-upgrade`, `db-revision`, `db-downgrade` y `db-history` viven en el `Makefile`.
 
 ### Como funciona autogenerate
 

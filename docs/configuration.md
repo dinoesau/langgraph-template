@@ -2,7 +2,7 @@
 
 All settings come from environment variables.
 Local dev reads `.env` through the pointer in `langgraph.json:1`.
-Typed settings in `src/core/config.py:1` are still planned.
+Typed settings live in `src/core/config.py:1`.
 
 ## Setup
 
@@ -32,11 +32,11 @@ Each key maps to `.env.example:1` through `.env.example:4` in order.
 ## Database
 
 Postgres is optional and local dev works without it.
-The graph runs without persistence until the checkpointer lands.
+Without `POSTGRES_URI` the graph runs ephemeral; with it set, threads persist per `thread_id`.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `POSTGRES_URI` | `postgresql://postgres:postgres@localhost:5432/postgres` | no | Full connection string for local dev |
+| `POSTGRES_URI` | empty (ephemeral loop) | no | Full connection string; enables persisted threads when set |
 | `POSTGRES_USER` | `postgres` | no | User for the compose service |
 | `POSTGRES_PASSWORD` | `postgres` | no | Password for the compose service |
 | `POSTGRES_DB` | `postgres` | no | Database name for the compose service |

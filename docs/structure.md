@@ -189,7 +189,7 @@ Never expose ORM models directly on the API.
 ### `alembic/`
 
 Alembic owns the app schema.
-It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`) or memory tables.
+It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) or memory tables.
 Exclude external tables in `env.py`.
 
 ### Observability
