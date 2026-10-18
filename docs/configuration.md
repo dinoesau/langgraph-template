@@ -61,10 +61,6 @@ Local runs read `.env`, deployed runs use real environment values.
 | `APP_HOST` | `127.0.0.1` | live | Host for the local HTTP server |
 | `APP_PORT` | `8000` | live | Port for the local HTTP server |
 | `CACHE_TTL_SECONDS` | `60` | live | Memory search cache TTL |
-| `LONG_TERM_MEMORY_COLLECTION_NAME` | `longterm_memory` | live | Logical vector collection name |
-| `LONG_TERM_MEMORY_MODEL` | empty | live | Reserved for LLM extraction |
-| `LONG_TERM_MEMORY_EMBEDDER_MODEL` | empty | live | Reserved for real embeddings |
-| `MEMORY_DISTANCE_MAX` | `2.0` | live | Max vector distance kept; tune down once traces show relevance |
 | `VALKEY_HOST` | empty | live | Enables shared cache; empty keeps in-memory fallback |
 | `DEFAULT_LLM_MODEL` | planned | planned | Starting model for the chat node |
 | `DEFAULT_LLM_TEMPERATURE` | planned | planned | Sampling temperature for chat completions |

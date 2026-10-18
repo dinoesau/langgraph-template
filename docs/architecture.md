@@ -31,7 +31,7 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | --- | --- | --- | --- |
 | Deploy contract | `langgraph.json:1` | Existe | Maps the `agent` name to the graph variable and points env to `.env` |
 | Package state | `src/agent/state.py:1` | Existe | Defines `GraphState` as the single source of truth |
-| Graph wiring | `src/agent/graph.py:1` | Existe | Echo loop exports `graph` with recall plus store hooks, `chat` to `tool_call` arrives with the tool-calling loop |
+| Graph wiring | `src/agent/graph.py:1` | Existe | Echo loop exports `graph` with recall via `get_store` plus cache, `chat` to `tool_call` arrives with the tool-calling loop |
 | Nodes | `src/agent/nodes.py:1` | Planeado | Runs LLM and tool calls and returns partial state updates |
 | Tools | `src/agent/tools/:1` | Planeado | Holds one capability module per file behind a shared list |
 | Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
@@ -40,7 +40,7 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls with transitional `X-User-ID`, auth arrives with the auth lifecycle |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Cache | `src/core/cache.py:1` | Existe | Valkey front with in-memory TTL fallback for recall |
-| Memory | `src/services/memory.py:1` | Existe | Per-user recall plus background writes with pgvector plus fallback |
+| Memory | `src/services/memory.py:1` | Existe | Per-user namespaces plus extract plus background writer over `BaseStore` |
 | Services | `src/services/:1` | Parcial | Database access exists, LLM fallback stays planned |
 | Checkpointer | AsyncPostgresSaver | Existe | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs local pgvector on port 5432 plus Valkey on port 6379 |
@@ -70,8 +70,8 @@ Each step below runs in order for one user message.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
 3. The `echo` node loads per-user recall as `docs` when a caller id is present, with no model call.
 4. The graph ends the turn with no tool calls.
-5. The checkpointer persists state per thread in Postgres when the lifespan provides it; without Postgres the loop stays ephemeral with in-memory recall.
-6. Memory extraction plus store runs after the reply without slowing the async chat path and drains on shutdown.
+5. The checkpointer persists state per thread in Postgres when the lifespan provides it; without Postgres the loop stays ephemeral with in-memory recall. Persisted graphs require the async serving path because `AsyncPostgresSaver` is async-only.
+6. Memory extraction plus store runs as Starlette background tasks after the reply without slowing the chat path.
 7. The final message returns to Studio.
 
 Auth and rate limits are planned with `src/api/` and `src/services/`; recall uses transitional `X-User-ID` until S4 tokens land, and production ignores that header.

@@ -177,7 +177,7 @@ It never defines nodes, edges, or prompts.
 ### `src/services/`
 
 `llm/` holds the model registry with retries, circular fallback, and a total timeout budget.
-`memory.py` holds long-term semantic memory plus cache.
+`memory.py` holds extract plus namespaces plus the background writer over the bound `BaseStore`.
 `database.py` holds user/session CRUD and provides the checkpointer via lifespan dependency.
 
 ### `src/models/` and `src/schemas/`
@@ -189,7 +189,7 @@ Never expose ORM models directly on the API.
 ### `alembic/`
 
 Alembic owns the app schema.
-It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) or memory tables.
+It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) or store tables (`store`, `store_vectors`, `store_migrations`).
 Exclude external tables in `env.py`.
 
 ### Observability

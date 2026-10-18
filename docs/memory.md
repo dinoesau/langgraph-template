@@ -8,50 +8,48 @@ This guide describes the shipped S2b behavior plus the target design.
 
 Short term state lives in the graph checkpointer.
 `GraphState` in `src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-Graphs use `make_the_agent(checkpointer, recall_hook, store_hook)` with `AsyncPostgresSaver` per `docs/structure.md:140`.
+Graphs use `make_the_agent(checkpointer, store, cache)` with `AsyncPostgresSaver` plus a LangGraph `BaseStore` per `docs/structure.md:140`.
+Nodes read recall through `get_store` with the per-user namespace `("memories", user_id)`, sync search on the sync path and async search on the async path.
 Recall is injected as `docs` on `invoke`, `ainvoke` and `astream` alike when a caller id is present.
-The lifespan wires hooks with or without Postgres; without Postgres recall runs on the in-memory fallback so fresh clones keep S2b behavior.
+The lifespan builds the store with or without Postgres: `InMemoryStore` for fresh clones, pooled `AsyncPostgresStore` with `setup` when `POSTGRES_URI` is set.
+Matching is keyword-grade until a store index with real embeddings lands with the model registry.
 See `src/agent/graph.py:1` for the wiring point.
 See `docs/structure.md:180` for the `src/services/memory.py:1` role.
 See `docs/structure.md:173` for the `src/core/cache.py:1` role.
-Semantic memory and cache exist with pgvector plus Valkey in compose and in-memory fallbacks in code.
+Semantic memory and cache exist with Postgres plus Valkey in compose and in-memory fallbacks in code.
 Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until S4 session tokens replace it; production ignores the header so it cannot spoof recall.
 Today `docker-compose.yml:1` starts pgvector plus Valkey.
 
 ## Overview
 
-Each chat turn will load a small set of relevant memories.
-Memories will be extracted from past conversations.
-Memories will be stored as vector embeddings.
-Retrieval will be semantic per user on each request.
-The agent will receive them as plain context text.
+Each chat turn loads a small set of relevant memories.
+Memories are extracted from past conversations with a heuristic.
+Memories are stored as plain text rows under the caller namespace.
+Retrieval is per user on each request through the bound store.
+The agent receives them as plain context text.
 
 ```mermaid
 sequenceDiagram
     participant G as LangGraph
-    participant MS as MemoryService
     participant Cache as Cache
-    participant M as MemoryStore
-    participant PG as pgvector
+    participant S as BaseStore
+    participant PG as Postgres
 
     Note over G: On every chat request
-    G->>MS: search user_id and query
-    MS->>Cache: get memory key
+    G->>Cache: get memory key
     alt cache hit
-        Cache-->>MS: cached result
+        Cache-->>G: cached result
     else cache miss
-        MS->>M: semantic search
-        M->>PG: vector similarity search
-        PG-->>M: top-k memories
-        M-->>MS: formatted results
-        MS->>Cache: set key with TTL
+        G->>S: search namespace plus query
+        S->>PG: namespace-scoped search
+        PG-->>S: top-k rows
+        S-->>G: formatted results
+        G->>Cache: set key with TTL
     end
-    MS-->>G: relevant memories string
+    G-->>G: relevant memories string
 
-    Note over G: After LLM response in background
-    G-)MS: add user_id and messages
-    MS->>M: extract and store embeddings
-    M->>PG: store new vectors
+    Note over G: After HTTP response
+    G-)S: put user_id namespace plus messages
 ```
 
 ## Cache layer
@@ -78,10 +76,6 @@ The chat response stays correct even when memory fails.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| LONG_TERM_MEMORY_COLLECTION_NAME | longterm_memory | Logical collection name, read at startup |
-| LONG_TERM_MEMORY_MODEL | empty | Reserved: LLM used to extract memories |
-| LONG_TERM_MEMORY_EMBEDDER_MODEL | empty | Reserved: embedding model for search |
-| MEMORY_DISTANCE_MAX | 2.0 | Max vector distance kept; 2.0 keeps top-K unfiltered |
 | CACHE_TTL_SECONDS | 60 | Memory search cache TTL |
 | VALKEY_HOST | empty | Set to enable shared cache |
 
@@ -109,16 +103,14 @@ Session scope will still come from `thread_id` in the checkpointer.
 ## What exists today
 
 `docker-compose.yml:1` starts pgvector on port 5432 plus Valkey on port 6379.
-`pyproject.toml:1` carries `redis` for the shared cache front.
-Vectors live in `memory_vectors`, excluded from Alembic and owned by the memory layer.
-Embeddings are deterministic 64-dim hash vectors until `LONG_TERM_MEMORY_EMBEDDER_MODEL` names a real model, which will need a column migration.
-Vector search filters by `MEMORY_DISTANCE_MAX` and the keyword fallback escapes LIKE wildcards.
-Postgres opens one short-lived connection per call with a connect timeout; pooling arrives with load in S8.
-Degraded turns log a warning with request context and stay correct; counters and traces arrive with S6.
+`pyproject.toml:1` carries `redis` for the shared cache plus `langgraph-store-postgres` for durable rows.
+Rows live in `store` plus `store_vectors` plus `store_migrations`, excluded from Alembic and owned by the store.
+Matching is keyword-grade with per-user namespaces until a store index with real embeddings lands.
+Writes run as Starlette background tasks after the response, never as untracked loop tasks.
 `langgraph.json:1` only maps the graph and env file.
 
 ## Next steps
 
 Replace transitional `X-User-ID` with the S4 session token claim.
 Replace heuristic extraction with LLM extraction once the model registry lands.
-Tune `CACHE_TTL_SECONDS` plus top-k plus `MEMORY_DISTANCE_MAX` once S6 traces show hit rates.
+Add a store index with real embeddings, then tune `CACHE_TTL_SECONDS` plus top-k once S6 traces show hit rates.

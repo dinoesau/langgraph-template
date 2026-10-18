@@ -43,14 +43,14 @@ Session copia el username al crearse para evitar una lectura extra en cada chat.
 Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session en el slice de auth.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
 Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
-La tabla de memoria semantica `memory_vectors` la gestiona la capa de memoria y tampoco Alembic.
+Las tablas del store `store`, `store_vectors` y `store_migrations` las gestiona LangGraph y tampoco Alembic.
 
 ## Checkpointer
 
 La persistencia usa `AsyncPostgresSaver` con un hilo por `thread_id`.
 El grafo recibe el checkpointer por fabrica y nunca lo importa directo.
-El patron es `make_the_agent(checkpointer)` segun `docs/structure.md:140`.
-El checkpointer se provee como dependencia de lifespan desde `src/services/database.py:1`.
+El patron es `make_the_agent(checkpointer, store, cache)` segun `docs/structure.md:140`.
+El checkpointer mas el store se proveen como dependencia de lifespan desde `src/services/database.py:1`.
 Sin `POSTGRES_URI` el loop sigue efimero; con la variable puesta el arranque falla si el store no responde.
 Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.
 `GraphState` en `src/agent/state.py:1` usa `MessagesState` con `messages` mas lista pequena `docs`.
@@ -73,7 +73,7 @@ Los atajos `db-upgrade`, `db-revision`, `db-downgrade` y `db-history` viven en e
 El archivo `alembic/env.py:1` importara todos los modelos para registrar sus metadatos.
 Alembic comparara el schema de la base contra los modelos y generara upgrade y downgrade.
 La funcion `include_object` en `alembic/env.py:1` excluira tablas externas.
-Las tablas excluidas seran las del checkpointer y las de memoria semantica.
+Las tablas excluidas seran las del checkpointer (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) y las del store (`store`, `store_vectors`, `store_migrations`).
 Asi Alembic nunca tocara lo que gestionan LangGraph o la capa de memoria.
 
 ### Agregar un modelo nuevo
@@ -90,5 +90,6 @@ Usa `pgvector/pgvector:pg15` con extension vectorial mas Valkey en `6379`.
 La extension se habilitara con `CREATE EXTENSION IF NOT EXISTS vector` antes de migrar.
 Con Docker ese paso sera automatico en el servicio de base de datos.
 En bases externas habilita la extension desde el panel o el editor SQL.
-La memoria semantica de largo plazo usa pgvector y vive en `src/services/memory.py:1`.
+La memoria de largo plazo usa el store de LangGraph con namespaces por usuario y vive en `src/services/memory.py:1`.
+Sin `POSTGRES_URI` el store es en memoria; con la variable puesta usa `AsyncPostgresStore` con pool mas `setup`.
 El frente de cache vive en `src/core/cache.py:1` con fallback in-memory.
