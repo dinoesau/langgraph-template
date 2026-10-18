@@ -17,10 +17,10 @@ from langgraph.store.memory import InMemoryStore
 
 from agent.graph import make_the_agent
 from api.app import create_app
-from core.cache import RecallCache, build_cache, build_memory_key
+from core.cache import RecallCache, build_cache
 from core.config import get_settings
-from core.memory import format_recall, memory_namespace
-from services.memory import extract_memories, persist_turn
+from core.memory import build_memory_key, format_recall, memory_namespace
+from services.memory import extract_memories, persist_turn, snapshot_messages
 
 
 @pytest.fixture(name="clean_env")
@@ -444,3 +444,33 @@ def test_lifespan_closes_cache_on_shutdown(
         pass
     assert "async" in closed
     assert "sync" in closed
+
+
+def test_snapshot_shapes_match_across_paths(clean_env: None) -> None:
+    full = snapshot_messages("hello", "Echo: hello")
+    assert [type(message) for message in full] == [HumanMessage, AIMessage]
+    cancelled = snapshot_messages("hello", None)
+    assert [type(message) for message in cancelled] == [HumanMessage]
+    assert snapshot_messages("hello", "   ") == cancelled
+
+
+def test_writer_persists_cancelled_stream(clean_env: None) -> None:
+    async def _run() -> list[Any]:
+        store, _ = make_parts()
+        await persist_turn(store, "alice", snapshot_messages("alice customtea", None))
+        return list(await store.asearch(memory_namespace("alice"), query="customtea", limit=5))
+
+    assert asyncio.run(_run())
+
+
+def test_overlong_user_id_skips_loop_recall(clean_env: None) -> None:
+    async def _run() -> Any:
+        store, cache = make_parts()
+        await store.aput(memory_namespace("alice"), "m1", {"text": "alice likes green tea"})
+        agent = make_agent(store, cache)
+        return await agent.ainvoke(
+            {"messages": [HumanMessage(content="green tea")]},
+            config={"configurable": {"thread_id": "t1", "user_id": "a" * 200}},
+        )
+
+    assert asyncio.run(_run()).get("docs") is None

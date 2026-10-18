@@ -49,7 +49,17 @@ def test_threads_stay_isolated() -> None:
 
 def test_loop_never_imports_storage() -> None:
     source = Path("src/agent/graph.py").read_text()
-    for forbidden in ("services", "postgres", "psycopg", "sqlalchemy", "alembic"):
+    for forbidden in (
+        "services",
+        "postgres",
+        "psycopg",
+        "sqlalchemy",
+        "alembic",
+        "core.cache",
+        "core/cache",
+        "redis",
+        "valkey",
+    ):
         assert forbidden not in source
 
 
