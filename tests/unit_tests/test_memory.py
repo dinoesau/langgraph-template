@@ -341,15 +341,15 @@ def test_concurrent_recall_stays_isolated(clean_env: None) -> None:
 
 def test_memory_settings_load_from_env(clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CACHE_TTL_SECONDS", "120")
-    monkeypatch.setenv("CACHE_MAX_ENTRIES", "500")
     get_settings.cache_clear()
     assert get_settings().cache_ttl_seconds == 120
-    assert get_settings().cache_max_entries == 500
 
 
 def test_cache_evicts_oldest_beyond_max(clean_env: None) -> None:
+    from core.cache import InMemoryTTLCache
+
     async def _run() -> tuple[str | None, str | None, int]:
-        cache = build_cache("", max_entries=2)
+        cache = RecallCache(primary=None, fallback=InMemoryTTLCache(max_entries=2))
         await cache.set("k1", "v1", 60)
         await cache.set("k2", "v2", 60)
         await cache.set("k3", "v3", 60)
@@ -436,7 +436,7 @@ def test_lifespan_closes_cache_on_shutdown(
 
     from services import database
 
-    def _recording(host: str, max_entries: int = 1000) -> RecallCache:
+    def _recording(host: str) -> RecallCache:
         return RecallCache(primary=RecordingPrimary(), fallback=InMemoryTTLCache())
 
     monkeypatch.setattr(database, "build_cache", _recording)
