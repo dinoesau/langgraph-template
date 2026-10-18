@@ -11,12 +11,12 @@ content hashes so repeating a turn overwrites instead of growing the store.
 import hashlib
 import logging
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.store.base import BaseStore
 
 from core.memory import memory_namespace
 
-__all__ = ["extract_memories", "persist_turn"]
+__all__ = ["extract_memories", "persist_turn", "snapshot_messages"]
 
 logger = logging.getLogger("memory")
 
@@ -61,3 +61,15 @@ async def persist_turn(store: BaseStore, user_id: str, messages: list[BaseMessag
             await store.aput(memory_namespace(clean_user), row_key(text), {"text": text})
     except Exception as exc:  # noqa: BLE001 - write miss keeps reply correct
         logger.warning("memory store degraded: %s", exc)
+
+
+def snapshot_messages(human_text: str, reply_text: str | None) -> list[BaseMessage]:
+    """Build one writer snapshot so invoke and stream persist equal shapes.
+
+    A cancelled stream yields no reply, so the writer keeps the human turn
+    instead of dropping the whole write.
+    """
+    messages: list[BaseMessage] = [HumanMessage(content=human_text)]
+    if reply_text and reply_text.strip():
+        messages.append(AIMessage(content=reply_text))
+    return messages

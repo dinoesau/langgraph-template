@@ -7,12 +7,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
 from starlette.background import BackgroundTask
 
 from agent.graph import AgentGraph
 from api.deps import WriterHook, get_memory_writer, get_request_graph, get_request_user_id
+from services.memory import snapshot_messages
 
 router = APIRouter(tags=["chat"])
 
@@ -80,9 +81,7 @@ async def chat(
     """Delegate one turn to the loop and persist memories after the reply."""
     thread_id = body.thread_id or uuid.uuid4().hex
     reply = await _invoke_loop(agent, body.message, thread_id, user_id)
-    background.add_task(
-        writer, user_id, [HumanMessage(content=body.message), AIMessage(content=reply)]
-    )
+    background.add_task(writer, user_id, snapshot_messages(body.message, reply))
     return ChatResponse(reply=reply, thread_id=thread_id)
 
 
@@ -98,10 +97,7 @@ def chat_stream(
     box: dict[str, str] = {}
 
     async def _write_after() -> None:
-        messages: list[BaseMessage] = [HumanMessage(content=body.message)]
-        if box.get("reply"):
-            messages.append(AIMessage(content=box["reply"]))
-        await writer(user_id, messages)
+        await writer(user_id, snapshot_messages(body.message, box.get("reply")))
 
     return StreamingResponse(
         _stream_loop(agent, body.message, thread_id, user_id, box),

@@ -1,33 +1,17 @@
 """Shared recall cache: Valkey front with local TTL fallback.
 
-Keys look like ``memory:{user_id}:{query_hash}`` so recall stays scoped
-per requesting end user. Only successful non-empty recall is cached
-by the caller; errors are never cached. Sets warm both the shared front
-and the local map so a Valkey flap cannot cause a miss storm.
+Keys come from ``core.memory`` so loop and adapter scope identically.
+Only successful non-empty recall is cached by the caller; errors are
+never cached. Sets warm both the shared front and the local map so a
+Valkey flap cannot cause a miss storm.
 """
 
-import hashlib
 import logging
 import threading
 import time
 from typing import Any, Protocol
 
 logger = logging.getLogger("cache")
-
-
-def normalize_query(query: str) -> str:
-    """Collapse whitespace and lowercase so similar asks share a key."""
-    return " ".join(query.strip().lower().split())
-
-
-def hash_query(query: str) -> str:
-    """Return the 16 hex chars identifying one normalized query."""
-    return hashlib.sha256(normalize_query(query).encode()).hexdigest()[:16]
-
-
-def build_memory_key(user_id: str, query: str) -> str:
-    """Return the scoped cache key for one user plus one query."""
-    return f"memory:{user_id.strip()}:{hash_query(query)}"
 
 
 class SyncCacheBackend(Protocol):

@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig, RunnableLambda
@@ -13,13 +13,26 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
 from agent.state import GraphState
-from core.cache import build_memory_key
-from core.memory import DEFAULT_TOP_K, format_recall, memory_namespace, recall_texts
-
-if TYPE_CHECKING:
-    from core.cache import RecallCache
+from core.memory import (
+    DEFAULT_TOP_K,
+    build_memory_key,
+    format_recall,
+    memory_namespace,
+    normalize_query,
+    recall_texts,
+    valid_user_id,
+)
 
 logger = logging.getLogger("agent")
+
+
+class RecallCachePort(Protocol):
+    """Cache port owned by the loop; adapters satisfy it structurally."""
+
+    def get_sync(self, key: str) -> str | None: ...
+    def set_sync(self, key: str, value: str, ttl: int) -> None: ...
+    async def get(self, key: str) -> str | None: ...
+    async def set(self, key: str, value: str, ttl: int) -> None: ...
 
 
 def _last_human_text(messages: Sequence[BaseMessage]) -> str:
@@ -38,16 +51,18 @@ def _request_user_id(config: RunnableConfig | None) -> str:
         return ""
     configurable = config.get("configurable") or {}
     raw = configurable.get("user_id", "")
-    return raw.strip() if isinstance(raw, str) else ""
+    return valid_user_id(raw) if isinstance(raw, str) else ""
 
 
 def _recall_sync(
-    store: BaseStore, cache: "RecallCache | None", ttl: int, user_id: str, query: str
+    store: BaseStore, cache: RecallCachePort | None, ttl: int, user_id: str, query: str
 ) -> str:
     """Load per-user recall on the sync path; empty means inject nothing."""
+    normalized = normalize_query(query)
+    key = build_memory_key(user_id, normalized)
     if cache is not None:
         try:
-            cached = cache.get_sync(build_memory_key(user_id, query))
+            cached = cache.get_sync(key)
         except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
             logger.warning("recall cache degraded: %s", exc)
             cached = None
@@ -55,40 +70,44 @@ def _recall_sync(
             return cached
     try:
         recall = format_recall(
-            recall_texts(store.search(memory_namespace(user_id), query=query, limit=DEFAULT_TOP_K))
+            recall_texts(
+                store.search(memory_namespace(user_id), query=normalized, limit=DEFAULT_TOP_K)
+            )
         )
     except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
         logger.warning("recall degraded: %s", exc)
         return ""
     if recall and cache is not None:
         try:
-            cache.set_sync(build_memory_key(user_id, query), recall, ttl)
+            cache.set_sync(key, recall, ttl)
         except Exception as exc:  # noqa: BLE001 - recall stands without cache
             logger.warning("recall cache degraded: %s", exc)
     return recall
 
 
 async def _recall_async(
-    store: BaseStore, cache: "RecallCache | None", ttl: int, user_id: str, query: str
+    store: BaseStore, cache: RecallCachePort | None, ttl: int, user_id: str, query: str
 ) -> str:
     """Load per-user recall on the async path; empty means inject nothing."""
+    normalized = normalize_query(query)
+    key = build_memory_key(user_id, normalized)
     if cache is not None:
         try:
-            cached = await cache.get(build_memory_key(user_id, query))
+            cached = await cache.get(key)
         except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
             logger.warning("recall cache degraded: %s", exc)
             cached = None
         if cached:
             return cached
     try:
-        hits = await store.asearch(memory_namespace(user_id), query=query, limit=DEFAULT_TOP_K)
+        hits = await store.asearch(memory_namespace(user_id), query=normalized, limit=DEFAULT_TOP_K)
         recall = format_recall(recall_texts(hits))
     except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
         logger.warning("recall degraded: %s", exc)
         return ""
     if recall and cache is not None:
         try:
-            await cache.set(build_memory_key(user_id, query), recall, ttl)
+            await cache.set(key, recall, ttl)
         except Exception as exc:  # noqa: BLE001 - recall stands without cache
             logger.warning("recall cache degraded: %s", exc)
     return recall
@@ -101,7 +120,7 @@ def make_the_agent(
     checkpointer: BaseCheckpointSaver[str] | None = None,
     *,
     store: BaseStore | None = None,
-    cache: "RecallCache | None" = None,
+    cache: RecallCachePort | None = None,
     cache_ttl_seconds: int = 60,
 ) -> AgentGraph:
     """Compile the echo loop with recall resolved through the bound store.

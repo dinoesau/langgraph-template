@@ -7,10 +7,9 @@ from langchain_core.messages import BaseMessage
 
 from agent.graph import AgentGraph
 from core.config import get_settings
+from core.memory import valid_user_id
 from services.database import get_agent_graph, get_agent_store
 from services.memory import persist_turn
-
-MAX_USER_ID_CHARS = 128
 
 WriterHook = Callable[[str, list[BaseMessage]], Awaitable[None]]
 
@@ -30,11 +29,7 @@ def get_request_user_id(request: Request) -> str:
     """
     if get_settings().app_env == "production":
         return ""
-    raw = request.headers.get("X-User-ID", "")
-    if len(raw.strip()) > MAX_USER_ID_CHARS:
-        return ""
-    clean = " ".join(raw.strip().split())
-    return clean[:MAX_USER_ID_CHARS]
+    return valid_user_id(request.headers.get("X-User-ID", ""))
 
 
 def get_memory_writer(request: Request) -> WriterHook:
