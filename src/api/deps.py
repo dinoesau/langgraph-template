@@ -31,6 +31,8 @@ def get_request_user_id(request: Request) -> str:
     if get_settings().app_env == "production":
         return ""
     raw = request.headers.get("X-User-ID", "")
+    if len(raw.strip()) > MAX_USER_ID_CHARS:
+        return ""
     clean = " ".join(raw.strip().split())
     return clean[:MAX_USER_ID_CHARS]
 

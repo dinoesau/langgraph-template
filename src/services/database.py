@@ -88,6 +88,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         try:
             yield
         finally:
+            cache.close_sync()
             await cache.aclose()
         return
     async with AsyncPostgresSaver.from_conn_string(postgres_uri) as saver:
@@ -101,4 +102,5 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 yield
             finally:
+                cache.close_sync()
                 await cache.aclose()
