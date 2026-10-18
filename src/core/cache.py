@@ -5,6 +5,7 @@ per requesting end user. Only successful non-empty recall is cached
 by the caller; errors are never cached.
 """
 
+import asyncio
 import hashlib
 import logging
 import time
@@ -42,19 +43,22 @@ class InMemoryTTLCache:
 
     def __init__(self) -> None:
         self._values: dict[str, tuple[str, float]] = {}
+        self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> str | None:
-        found = self._values.get(key)
-        if found is None:
-            return None
-        value, expires_at = found
-        if expires_at <= time.monotonic():
-            self._values.pop(key, None)
-            return None
-        return value
+        async with self._lock:
+            found = self._values.get(key)
+            if found is None:
+                return None
+            value, expires_at = found
+            if expires_at <= time.monotonic():
+                self._values.pop(key, None)
+                return None
+            return value
 
     async def set(self, key: str, value: str, ttl: int) -> None:
-        self._values[key] = (value, time.monotonic() + max(1, ttl))
+        async with self._lock:
+            self._values[key] = (value, time.monotonic() + max(1, ttl))
 
     def clear(self) -> None:
         """Drop every entry; tests use this for isolation."""
@@ -108,7 +112,6 @@ class RecallCache:
         if self._primary is not None:
             try:
                 await self._primary.set(key, value, ttl)
-                return
             except Exception:  # noqa: BLE001 - fallback below keeps recall
                 logger.debug("primary cache set failed, using fallback")
         await self._fallback.set(key, value, ttl)

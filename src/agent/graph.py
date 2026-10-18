@@ -1,5 +1,6 @@
 """Echo loop: proves the deploy contract with no model and no storage."""
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
@@ -55,13 +56,22 @@ def make_the_agent(
 
     def echo_sync(state: GraphState, config: RunnableConfig | None = None) -> dict[str, list[Any]]:
         text = _last_human_text(state.get("messages", []))
-        reply = AIMessage(content=f"Echo: {text}")
         user_id = _request_user_id(config)
+        recall = ""
+        if recall_hook is not None and user_id:
+            try:
+                recall = asyncio.run(recall_hook(user_id, text))
+            except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
+                logger.warning("recall degraded: %s", exc)
+                recall = ""
+        reply = AIMessage(content=f"Echo: {text}")
         if store_hook is not None and user_id:
             try:
                 store_hook(user_id, [*state.get("messages", []), reply])
             except Exception as exc:  # noqa: BLE001 - hook miss keeps reply
                 logger.warning("background write degraded: %s", exc)
+        if recall.strip():
+            return {"messages": [reply], "docs": [recall]}
         return {"messages": [reply]}
 
     async def echo_async(

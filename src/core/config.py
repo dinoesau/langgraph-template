@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     postgres_uri: str = ""
     # S2b semantic memory plus cache. Empty host keeps the local fallback.
     cache_ttl_seconds: int = Field(default=60, ge=1, le=3600)
-    long_term_memory_collection: str = "longterm_memory"
+    long_term_memory_collection_name: str = "longterm_memory"
     long_term_memory_model: str = ""
     long_term_memory_embedder_model: str = ""
+    memory_distance_max: float = Field(default=2.0, ge=0.0, le=2.0)
     valkey_host: str = ""
 
 

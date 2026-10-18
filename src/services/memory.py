@@ -22,6 +22,13 @@ EMBEDDING_DIM = 64
 DEFAULT_TOP_K = 4
 MAX_MEMORY_CHARS = 500
 MAX_STORED_PER_USER = 100
+CONNECT_TIMEOUT_SECONDS = 5
+DRAIN_TIMEOUT_SECONDS = 5.0
+
+
+def escape_like(text: str) -> str:
+    """Escape LIKE wildcards so a query of `%` cannot match everything."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def embed_text(text: str) -> list[float]:
@@ -111,7 +118,9 @@ class PostgresVectorStore:
         import psycopg
 
         async with (
-            await psycopg.AsyncConnection.connect(self._conninfo) as conn,
+            await psycopg.AsyncConnection.connect(
+                self._conninfo, connect_timeout=CONNECT_TIMEOUT_SECONDS
+            ) as conn,
             conn.cursor() as cur,
         ):
             await cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
@@ -132,17 +141,21 @@ class PostgresVectorStore:
         import psycopg
 
         embedding = format_embedding(embed_text(query))
+        threshold = get_settings().memory_distance_max
         async with (
-            await psycopg.AsyncConnection.connect(self._conninfo) as conn,
+            await psycopg.AsyncConnection.connect(
+                self._conninfo, connect_timeout=CONNECT_TIMEOUT_SECONDS
+            ) as conn,
             conn.cursor() as cur,
         ):
             try:
                 await cur.execute(
                     f"SELECT content FROM {MEMORY_TABLE} "
                     "WHERE user_id = %s "
+                    "AND (embedding <=> %s::vector) <= %s "
                     "ORDER BY embedding <=> %s::vector "
                     "LIMIT %s",
-                    (user_id, embedding, max(1, limit)),
+                    (user_id, embedding, threshold, embedding, max(1, limit)),
                 )
                 rows = await cur.fetchall()
                 return [str(row[0]) for row in rows]
@@ -150,9 +163,9 @@ class PostgresVectorStore:
                 await conn.rollback()
                 await cur.execute(
                     f"SELECT content FROM {MEMORY_TABLE} "
-                    "WHERE user_id = %s AND content ILIKE %s "
+                    "WHERE user_id = %s AND content ILIKE %s ESCAPE '\\' "
                     "ORDER BY created_at DESC LIMIT %s",
-                    (user_id, f"%{query.strip()}%", max(1, limit)),
+                    (user_id, f"%{escape_like(query.strip())}%", max(1, limit)),
                 )
                 rows = await cur.fetchall()
                 return [str(row[0]) for row in rows]
@@ -164,7 +177,9 @@ class PostgresVectorStore:
         if not cleaned:
             return
         async with (
-            await psycopg.AsyncConnection.connect(self._conninfo) as conn,
+            await psycopg.AsyncConnection.connect(
+                self._conninfo, connect_timeout=CONNECT_TIMEOUT_SECONDS
+            ) as conn,
             conn.cursor() as cur,
         ):
             for text in cleaned:
@@ -211,6 +226,7 @@ async def search(user_id: str, query: str, limit: int = DEFAULT_TOP_K) -> str:
         logger.warning("memory cache get degraded: %s", exc)
         cached = None
     if cached:
+        logger.debug("memory cache hit")
         return cached
     try:
         hits = await get_memory_store().search(clean_user, query, limit)
@@ -241,37 +257,68 @@ async def store_turn(user_id: str, messages: list[BaseMessage]) -> None:
         logger.warning("memory store degraded: %s", exc)
 
 
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
 def schedule_store(user_id: str, messages: list[BaseMessage]) -> None:
-    """Fire-and-forget write after the reply; never slows the chat path."""
+    """Write after the reply without slowing the async chat path.
+
+    On the async path the write runs as a tracked background task. On the
+    sync path with no running loop it runs inline so sync turns stay durable.
+    Failures are logged and ignored either way.
+    """
     clean_user = user_id.strip()
     if not clean_user:
         return
+    snapshot = list(messages)
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        try:
+            asyncio.run(store_turn(clean_user, snapshot))
+        except Exception as exc:  # noqa: BLE001 - write miss keeps reply correct
+            logger.warning("memory store degraded: %s", exc)
         return
-    snapshot = list(messages)
 
     async def _run() -> None:
         await store_turn(clean_user, snapshot)
 
     task = loop.create_task(_run())
+    _background_tasks.add(task)
 
-    def _log_failure(done: asyncio.Task[None]) -> None:
+    def _drop(done: asyncio.Task[None]) -> None:
+        _background_tasks.discard(done)
         if done.cancelled():
             return
         exc = done.exception()
         if exc is not None:
             logger.warning("memory background write degraded: %s", exc)
 
-    task.add_done_callback(_log_failure)
+    task.add_done_callback(_drop)
+
+
+async def drain_background_writes(timeout: float = DRAIN_TIMEOUT_SECONDS) -> None:
+    """Await pending background writes; lifespan calls this on shutdown."""
+    pending = [task for task in _background_tasks if not task.done()]
+    if not pending:
+        return
+    try:
+        await asyncio.wait_for(asyncio.gather(*pending), timeout=timeout)
+    except TimeoutError as exc:
+        logger.warning("memory drain timed out with %d pending: %s", len(pending), exc)
+    finally:
+        for task in pending:
+            if task.done():
+                _background_tasks.discard(task)
 
 
 async def ensure_memory_schema() -> None:
     """Pre-warm the vector table at startup; degrade, never crash boot."""
-    uri = get_settings().postgres_uri.strip()
+    settings = get_settings()
+    uri = settings.postgres_uri.strip()
     if not uri:
         return
+    logger.debug("memory collection: %s", settings.long_term_memory_collection_name)
     store = get_memory_store()
     if isinstance(store, PostgresVectorStore):
         try:

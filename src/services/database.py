@@ -44,12 +44,26 @@ def get_agent_graph(app: FastAPI) -> AgentGraph:
 
 @asynccontextmanager
 async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Attach a persisted loop when POSTGRES_URI is set, else leave the ephemeral graph."""
-    from services.memory import ensure_memory_schema, schedule_store, search
+    """Attach the loop with memory hooks; checkpointer only when configured.
+
+    Recall works on the ephemeral fallback without Postgres so fresh clones
+    keep S2b behavior; Postgres upgrades durability to pgvector plus
+    persisted threads. Background writes drain on shutdown.
+    """
+    from services.memory import (
+        drain_background_writes,
+        ensure_memory_schema,
+        schedule_store,
+        search,
+    )
 
     postgres_uri = normalize_postgres_uri(get_settings().postgres_uri)
     if not postgres_uri:
-        yield
+        app.state.agent_graph = make_the_agent(recall_hook=search, store_hook=schedule_store)
+        try:
+            yield
+        finally:
+            await drain_background_writes()
         return
     async with AsyncPostgresSaver.from_conn_string(postgres_uri) as saver:
         await saver.setup()
@@ -57,4 +71,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.agent_graph = make_the_agent(
             checkpointer=saver, recall_hook=search, store_hook=schedule_store
         )
-        yield
+        try:
+            yield
+        finally:
+            await drain_background_writes()
