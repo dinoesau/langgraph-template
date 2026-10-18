@@ -340,5 +340,83 @@ def test_concurrent_recall_stays_isolated(clean_env: None) -> None:
 
 def test_memory_settings_load_from_env(clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CACHE_TTL_SECONDS", "120")
+    monkeypatch.setenv("CACHE_MAX_ENTRIES", "500")
     get_settings.cache_clear()
     assert get_settings().cache_ttl_seconds == 120
+    assert get_settings().cache_max_entries == 500
+
+
+def test_cache_evicts_oldest_beyond_max(clean_env: None) -> None:
+    async def _run() -> tuple[str | None, str | None, int]:
+        cache = build_cache("", max_entries=2)
+        await cache.set("k1", "v1", 60)
+        await cache.set("k2", "v2", 60)
+        await cache.set("k3", "v3", 60)
+        return await cache.get("k1"), await cache.get("k3"), len(cache._fallback)
+
+    evicted, kept, size = asyncio.run(_run())
+    assert evicted is None
+    assert kept == "v3"
+    assert size == 2
+
+
+def test_repeat_turns_do_not_duplicate_rows(clean_env: None) -> None:
+    async def _run() -> list[Any]:
+        store, _ = make_parts()
+        turn = [
+            HumanMessage(content="likes green tea"),
+            AIMessage(content="Echo: likes green tea"),
+        ]
+        await persist_turn(store, "alice", turn)
+        await persist_turn(store, "alice", turn)
+        return list(await store.asearch(memory_namespace("alice"), query="green tea", limit=10))
+
+    assert len(asyncio.run(_run())) == 1
+
+
+def test_cache_close_is_safe_without_server(clean_env: None) -> None:
+    async def _run() -> None:
+        cache = build_cache("")
+        await cache.set("k", "v", 60)
+        await cache.aclose()
+        await cache.aclose()
+        cache.close_sync()
+
+    asyncio.run(_run())
+
+
+def test_lifespan_closes_cache_on_shutdown(
+    clean_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from core.cache import InMemoryTTLCache, RecallCache
+
+    closed: list[str] = []
+
+    class RecordingPrimary:
+        def get_sync(self, key: str) -> str | None:
+            return None
+
+        def set_sync(self, key: str, value: str, ttl: int) -> None:
+            return None
+
+        async def get(self, key: str) -> str | None:
+            return None
+
+        async def set(self, key: str, value: str, ttl: int) -> None:
+            return None
+
+        def close_sync(self) -> None:
+            closed.append("sync")
+
+        async def aclose(self) -> None:
+            closed.append("async")
+
+    from services import database
+
+    def _recording(host: str, max_entries: int = 1000) -> RecallCache:
+        return RecallCache(primary=RecordingPrimary(), fallback=InMemoryTTLCache())
+
+    monkeypatch.setattr(database, "build_cache", _recording)
+    with TestClient(create_app()):
+        pass
+    assert "async" in closed
