@@ -171,6 +171,7 @@ It never defines nodes, edges, or prompts.
 
 `config.py` loads typed settings from env with documented defaults.
 `cache.py` fronts Valkey/Redis with in-memory fallback.
+`memory.py` holds the shared namespace plus recall formatter both layers import.
 `middleware.py` assigns request ids and logs structured JSON, metrics and profiling arrive with observability.
 `limiter.py` enforces rate limits.
 
