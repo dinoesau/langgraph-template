@@ -1,6 +1,6 @@
 """Persistence seam: checkpointer lifespan plus the Alembic ownership boundary."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -25,7 +25,7 @@ def alembic_include_object(
 
 
 @asynccontextmanager
-async def agent_lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Attach a persisted loop when POSTGRES_URI is set, else leave the ephemeral graph."""
     postgres_uri = get_settings().postgres_uri
     if not postgres_uri:
