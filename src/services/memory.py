@@ -14,7 +14,7 @@ import logging
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.store.base import BaseStore
 
-from core.memory import memory_namespace
+from core.memory import memory_namespace, normalize_query
 
 __all__ = ["extract_memories", "persist_turn", "snapshot_messages"]
 
@@ -45,7 +45,7 @@ def extract_memories(messages: list[BaseMessage]) -> list[str]:
 
 def row_key(text: str) -> str:
     """Return the content hash so repeats overwrite instead of duplicating."""
-    return hashlib.sha256(" ".join(text.strip().lower().split()).encode()).hexdigest()
+    return hashlib.sha256(normalize_query(text).encode()).hexdigest()
 
 
 async def persist_turn(store: BaseStore, user_id: str, messages: list[BaseMessage]) -> None:
