@@ -1,7 +1,7 @@
 """Persistence seam: checkpointer plus store lifespan plus the Alembic boundary."""
 
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -81,26 +81,28 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     postgres_uri = normalize_postgres_uri(settings.postgres_uri)
     cache = build_cache(settings.valkey_host)
     app.state.recall_cache = cache
-    if not postgres_uri:
-        store: BaseStore = InMemoryStore()
+    async with AsyncExitStack() as stack:
+        saver: Any = None
+        store: BaseStore
+        if postgres_uri:
+            saver = await stack.enter_async_context(
+                AsyncPostgresSaver.from_conn_string(postgres_uri)
+            )
+            await saver.setup()
+            pg_store = await stack.enter_async_context(
+                AsyncPostgresStore.from_conn_string(
+                    postgres_uri, pool_config={"max_size": settings.postgres_pool_max_size}
+                )
+            )
+            await pg_store.setup()
+            store = pg_store
+        else:
+            store = InMemoryStore()
+            
         app.state.agent_store = store
-        app.state.agent_graph = build_loop(None, store, cache, settings.cache_ttl_seconds)
+        app.state.agent_graph = build_loop(saver, store, cache, settings.cache_ttl_seconds)
         try:
             yield
         finally:
             cache.close_sync()
             await cache.aclose()
-        return
-    async with AsyncPostgresSaver.from_conn_string(postgres_uri) as saver:
-        await saver.setup()
-        async with AsyncPostgresStore.from_conn_string(
-            postgres_uri, pool_config={"max_size": 5}
-        ) as pg_store:
-            await pg_store.setup()
-            app.state.agent_store = pg_store
-            app.state.agent_graph = build_loop(saver, pg_store, cache, settings.cache_ttl_seconds)
-            try:
-                yield
-            finally:
-                cache.close_sync()
-                await cache.aclose()

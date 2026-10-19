@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     app_port: int = Field(default=8000, ge=1, le=65535)
     # Empty keeps the loop ephemeral; set POSTGRES_URI to persist threads.
     postgres_uri: str = ""
+    postgres_pool_max_size: int = Field(default=5, ge=1, le=50)
     # Semantic memory plus cache. Empty host keeps the local fallback.
     cache_ttl_seconds: int = Field(default=60, ge=1, le=3600)
     valkey_host: str = ""

@@ -37,11 +37,12 @@ Without `POSTGRES_URI` the graph runs ephemeral; with it set, threads persist pe
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `POSTGRES_URI` | empty (ephemeral loop) | no | Full connection string; enables persisted threads when set |
+| `POSTGRES_POOL_MAX_SIZE` | `5` | no | Max connections for the Postgres store pool |
 | `POSTGRES_USER` | `postgres` | no | User for the compose service |
 | `POSTGRES_PASSWORD` | `postgres` | no | Password for the compose service |
 | `POSTGRES_DB` | `postgres` | no | Database name for the compose service |
 
-`POSTGRES_URI` maps to `.env.example:5`.
+`POSTGRES_URI` maps to `.env.example:5` and `POSTGRES_POOL_MAX_SIZE` to `.env.example:6`.
 The compose values map to `docker-compose.yml:7` through `docker-compose.yml:9`.
 Start the service when you need persistence.
 
