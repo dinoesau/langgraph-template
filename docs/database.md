@@ -1,7 +1,7 @@
 # Database
 
 Estado: parcial.
-El checkpointer por fabrica, las migraciones con frontera, el schema de app y la memoria S2b ya existen.
+El checkpointer por fabrica, las migraciones con frontera, el schema de app y la memoria semantica ya existen.
 La extraccion LLM y auth siguen planeados.
 Este documento describe el diseno objetivo adaptado a este starter.
 
@@ -40,7 +40,7 @@ erDiagram
 User representa una cuenta con email unico.
 Session representa una conversacion y un usuario puede tener muchas.
 Session copia el username al crearse para evitar una lectura extra en cada chat.
-Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session en el slice de auth.
+Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session cuando aterricen los tokens de sesion.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
 Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
 Las tablas del store `store`, `store_vectors` y `store_migrations` las gestiona LangGraph y tampoco Alembic.

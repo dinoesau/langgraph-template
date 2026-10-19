@@ -1,8 +1,8 @@
 # Memory
 
 Long term memory is live for per-user recall with cache front.
-Extraction is heuristic; LLM extraction arrives with later slices.
-This guide describes the shipped S2b behavior plus the target design.
+Extraction is heuristic; LLM extraction arrives with the model registry.
+This guide describes the shipped behavior plus the target design.
 
 ## Status
 
@@ -17,7 +17,7 @@ See `src/agent/graph.py:1` for the wiring point.
 See `docs/structure.md:180` for the `src/services/memory.py:1` role.
 See `docs/structure.md:173` for the `src/core/cache.py:1` role.
 Semantic memory and cache exist with Postgres plus Valkey in compose and in-memory fallbacks in code.
-Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until S4 session tokens replace it; production ignores the header so it cannot spoof recall, and overlong ids degrade to no recall instead of colliding.
+Caller id is transitional `X-User-ID` via `src/api/deps.py:1` until session tokens replace it; production ignores the header so it cannot spoof recall, and overlong ids degrade to no recall instead of colliding.
 Today `docker-compose.yml:1` starts pgvector plus Valkey.
 
 ## Overview
@@ -113,6 +113,6 @@ Writes run as Starlette background tasks after the response, never as untracked 
 
 ## Next steps
 
-Replace transitional `X-User-ID` with the S4 session token claim.
+Replace transitional `X-User-ID` with the session token claim.
 Replace heuristic extraction with LLM extraction once the model registry lands.
-Add a store index with real embeddings, then tune `CACHE_TTL_SECONDS` plus top-k once S6 traces show hit rates.
+Add a store index with real embeddings, then tune `CACHE_TTL_SECONDS` plus top-k once traces show hit rates.
