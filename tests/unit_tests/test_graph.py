@@ -20,16 +20,10 @@ def test_echo_replies_with_fixed_greeting() -> None:
     assert messages[-1].content == "Echo: hello"
 
 
-def test_echo_rejects_empty_messages() -> None:
+@pytest.mark.parametrize(
+    "state",
+    [{"messages": []}, cast(GraphState, {}), {"messages": [HumanMessage(content="   ")]}],
+)
+def test_echo_rejects_bad_input(state: GraphState) -> None:
     with pytest.raises(ValueError):
-        graph.invoke({"messages": []})
-
-
-def test_echo_rejects_missing_messages() -> None:
-    with pytest.raises(ValueError):
-        graph.invoke(cast(GraphState, {}))
-
-
-def test_echo_rejects_blank_greeting() -> None:
-    with pytest.raises(ValueError):
-        graph.invoke({"messages": [HumanMessage(content="   ")]})
+        graph.invoke(state)

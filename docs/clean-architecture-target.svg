@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="Helvetica, Arial, sans-serif">
 <rect x="4" y="4" width="1232" height="792" rx="18" fill="#f4f4f4" stroke="#333" stroke-width="3"/>
-<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target (S0 to S8 build reference) v6</text>
+<text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target build reference v7</text>
 <text x="620" y="64" text-anchor="middle" font-size="12" font-style="italic" fill="#555">verified 2026-10-18: #1 confirmed tradeoff, #2 target-only + wiki 3.3 vs 6.1 conflict</text>
 
 <!-- rings -->
@@ -40,26 +40,26 @@
 <!-- right panel -->
 <g font-size="12.5">
 <text x="600" y="100" font-size="17" font-weight="bold" fill="#333">Entities — center, knows nothing outside</text>
-<text x="600" y="120" fill="#333">● GraphState (MessagesState tradeoff accepted S0-S3) · ● User · ● Session</text>
-<text x="600" y="138" fill="#333">○ Trajectory + EvalReport (scored JSON, S7b)</text>
+<text x="600" y="120" fill="#333">● GraphState (MessagesState tradeoff until the tool loop) · ● User · ● Session</text>
+<text x="600" y="138" fill="#333">○ Trajectory + EvalReport (scored JSON on demand)</text>
 
 <text x="600" y="166" font-size="17" font-weight="bold" fill="#333">Use Cases — loop owns state, tools, pure routing</text>
-<text x="600" y="186" fill="#333">● echo (transitional) → ○ chat + tool_call loop (S3)</text>
-<text x="600" y="204" fill="#333">○ booking tools (S3) · ○ retrieval + generator (S5a)</text>
-<text x="600" y="222" fill="#333">○ router triage (S5b) · ○ workers fan-out (S5c) · ○ grader (S5d)</text>
+<text x="600" y="186" fill="#333">● echo (transitional) → ○ chat + tool_call loop</text>
+<text x="600" y="204" fill="#333">○ booking tools · ○ retrieval + generator</text>
+<text x="600" y="222" fill="#333">○ router triage · ○ workers fan-out · ○ grader</text>
 
 <text x="600" y="250" font-size="17" font-weight="bold" fill="#333">Adapters — HTTP translates, services adapt</text>
 <text x="600" y="270" fill="#333">● chat/stream + health handlers · ● ChatResponse · ● api/deps</text>
-<text x="600" y="288" fill="#333">● lifespan + checkpointer + boundary · ○ user/session CRUD (S4)</text>
-<text x="600" y="306" fill="#333">○ auth handlers + tokens (S4) · ○ metrics handler (S6)</text>
-<text x="600" y="324" fill="#333">○ llm registry + fallback (S3) · ○ memory search/store (S2b)</text>
-<text x="600" y="342" fill="#333">○ cache front (S2b) · ○ limiter + middleware (S4/S6) · ○ eval runner (S7b)</text>
+<text x="600" y="288" fill="#333">● lifespan + checkpointer + boundary · ○ user/session CRUD</text>
+<text x="600" y="306" fill="#333">○ auth handlers + tokens · ○ metrics handler</text>
+<text x="600" y="324" fill="#333">○ llm registry + fallback · ● memory search/store</text>
+<text x="600" y="342" fill="#333">● cache front · ○ limiter + middleware · ○ eval runner</text>
 <text x="600" y="360" fill="#333">Rule: handlers read via api/deps, never direct service imports.</text>
 
 <text x="600" y="388" font-size="17" font-weight="bold" fill="#333">Drivers — swappable without touching the core</text>
 <text x="600" y="408" fill="#333">● FastAPI/uvicorn · ● Postgres · ● Alembic/SQLAlchemy · ● LangGraph</text>
-<text x="600" y="426" fill="#333">○ pgvector switch (S2b) · ○ Valkey (S2b) · ○ OpenAI/Anthropic/Google (S3)</text>
-<text x="600" y="444" fill="#333">○ LangSmith/Langfuse (S6) · ○ Prometheus/Grafana (S6) · ○ Compose + CI (S8)</text>
+<text x="600" y="426" fill="#333">● Postgres store + pool · ● Valkey · ○ OpenAI/Anthropic/Google</text>
+<text x="600" y="444" fill="#333">○ LangSmith/Langfuse · ○ Prometheus/Grafana · ○ Compose + CI</text>
 
 <text x="600" y="472" font-size="17" font-weight="bold" fill="#333">Full-turn flow (target only, not shipped)</text>
 <text x="600" y="492" font-family="monospace" font-size="12" fill="#333">target: token → recall → loop(thread) → fallback → tools</text>
@@ -67,8 +67,8 @@
 <text x="600" y="528" font-size="12" font-style="italic" fill="#333">shipped: token → loop(thread) only, no recall. Fix wiki 3.3 vs 6.1 first.</text>
 
 <text x="600" y="556" font-size="17" font-weight="bold" fill="#333">Build order</text>
-<text x="600" y="576" fill="#333">S2b memory → S3 tool loop → S4 auth → S5 patterns →</text>
-<text x="600" y="594" fill="#333">S6 observability → S7 journeys + evals → S8 stack + CI.</text>
+<text x="600" y="576" fill="#333">memory → tool loop → auth → patterns →</text>
+<text x="600" y="594" fill="#333">observability → journeys + evals → stack + CI.</text>
 <text x="600" y="612" fill="#333">New modules enter their ring; seams S1–S10 do not move.</text>
 </g>
 </svg>

@@ -49,7 +49,17 @@ def test_threads_stay_isolated() -> None:
 
 def test_loop_never_imports_storage() -> None:
     source = Path("src/agent/graph.py").read_text()
-    for forbidden in ("services", "postgres", "psycopg", "sqlalchemy", "alembic"):
+    for forbidden in (
+        "services",
+        "postgres",
+        "psycopg",
+        "sqlalchemy",
+        "alembic",
+        "core.cache",
+        "core/cache",
+        "redis",
+        "valkey",
+    ):
         assert forbidden not in source
 
 
@@ -59,6 +69,9 @@ def test_migrations_exclude_framework_tables() -> None:
         "checkpoint_blobs",
         "checkpoint_writes",
         "checkpoint_migrations",
+        "store",
+        "store_vectors",
+        "store_migrations",
     }
     for table in EXCLUDED_TABLES:
         assert alembic_include_object(None, table, "table", False, None) is False

@@ -171,13 +171,14 @@ It never defines nodes, edges, or prompts.
 
 `config.py` loads typed settings from env with documented defaults.
 `cache.py` fronts Valkey/Redis with in-memory fallback.
+`memory.py` holds the shared namespace plus recall formatter both layers import.
 `middleware.py` assigns request ids and logs structured JSON, metrics and profiling arrive with observability.
 `limiter.py` enforces rate limits.
 
 ### `src/services/`
 
 `llm/` holds the model registry with retries, circular fallback, and a total timeout budget.
-`memory.py` holds long-term semantic memory plus cache.
+`memory.py` holds extract plus namespaces plus the background writer over the bound `BaseStore`.
 `database.py` holds user/session CRUD and provides the checkpointer via lifespan dependency.
 
 ### `src/models/` and `src/schemas/`
@@ -189,7 +190,7 @@ Never expose ORM models directly on the API.
 ### `alembic/`
 
 Alembic owns the app schema.
-It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) or memory tables.
+It never touches checkpointer tables (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`) or store tables (`store`, `store_vectors`, `store_migrations`).
 Exclude external tables in `env.py`.
 
 ### Observability

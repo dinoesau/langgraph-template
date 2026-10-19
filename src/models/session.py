@@ -10,7 +10,7 @@ from models.base import Base
 
 
 class Session(Base):
-    """One conversation; the loop thread identifier maps to it from the auth slice on."""
+    """One conversation; the loop thread identifier maps to it once session tokens land."""
 
     __tablename__ = "sessions"
 
