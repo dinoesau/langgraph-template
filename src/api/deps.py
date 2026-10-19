@@ -22,9 +22,9 @@ def get_request_graph(request: Request) -> AgentGraph:
 def get_request_user_id(request: Request) -> str:
     """Read the transitional caller id; empty means no recall for the turn.
 
-    S4 replaces this header with the session token claim. Production ignores
+    Session tokens replace this header once the auth layer lands. Production ignores
     the header so unauthenticated clients cannot spoof recall; non-production
-    honors it for S2b demos. The value is stripped and length-capped so logs
+    honors it for local demos. The value is stripped and length-capped so logs
     and cache keys stay small.
     """
     if get_settings().app_env == "production":

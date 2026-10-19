@@ -1,4 +1,4 @@
-"""Unit tests for S2b per-user recall plus cache plus background writes.
+"""Unit tests for per-user recall plus cache plus background writes.
 
 No network and no containers: the store is InMemoryStore, the cache is
 the local TTL map, background writes run as Starlette background tasks.

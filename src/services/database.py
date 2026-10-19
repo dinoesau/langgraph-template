@@ -71,7 +71,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Attach the loop with recall on every boot; Postgres upgrades durability.
 
     Without POSTGRES_URI the loop stays ephemeral on an in-memory store so
-    fresh clones keep S2b recall. With it set, threads persist per thread
+    fresh clones keep per-user recall. With it set, threads persist per thread
     identifier and vectors live in Postgres; startup still fails fast when
     the store is unreachable.
     """
