@@ -14,12 +14,15 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
+from starlette.requests import Request
 
-from agent.graph import make_the_agent
+from agent.graph import graph, make_the_agent
 from api.app import create_app
-from core.cache import RecallCache, build_cache
+from api.deps import get_request_user_id
+from core.cache import InMemoryTTLCache, RecallCache, build_cache
 from core.config import get_settings
 from core.memory import build_memory_key, format_recall, memory_namespace
+from services import database
 from services.memory import extract_memories, persist_turn, snapshot_messages
 
 
@@ -49,6 +52,46 @@ def seed(store: BaseStore, user_id: str, text: str) -> None:
         await store.aput(memory_namespace(user_id), text, {"text": text})
 
     asyncio.run(_run())
+
+
+class StubPrimary:
+    """One double for every cache-front test: dict-backed, optionally failing."""
+
+    def __init__(self, fail: bool = False, closed: list[str] | None = None) -> None:
+        self.saved: dict[str, str] = {}
+        self.fail = fail
+        self.closed = closed if closed is not None else []
+
+    def _check(self) -> None:
+        if self.fail:
+            raise RuntimeError("valkey down")
+
+    def get_sync(self, key: str) -> str | None:
+        self._check()
+        return self.saved.get(key)
+
+    def set_sync(self, key: str, value: str, ttl: int) -> None:
+        self._check()
+        self.saved[key] = value
+
+    async def get(self, key: str) -> str | None:
+        return self.get_sync(key)
+
+    async def set(self, key: str, value: str, ttl: int) -> None:
+        self.set_sync(key, value, ttl)
+
+    def close_sync(self) -> None:
+        self.closed.append("sync")
+
+    async def aclose(self) -> None:
+        self.closed.append("async")
+
+
+class FailingStore(InMemoryStore):
+    """Store whose batch path is always down; writes must degrade, never raise."""
+
+    async def abatch(self, ops: Any) -> Any:
+        raise RuntimeError("vector down")
 
 
 def test_cache_key_scoped_per_user(clean_env: None) -> None:
@@ -112,8 +155,6 @@ def test_loop_without_user_id_skips_recall(clean_env: None) -> None:
 
 
 def test_bare_graph_stays_echo_only(clean_env: None) -> None:
-    from agent.graph import graph
-
     result = graph.invoke(
         {"messages": [HumanMessage(content="green tea")]},
         config={"configurable": {"thread_id": "t1", "user_id": "alice"}},
@@ -174,10 +215,6 @@ def test_repeated_recall_hits_cache(clean_env: None) -> None:
 
 
 def test_errors_are_never_cached(clean_env: None) -> None:
-    class FailingStore(InMemoryStore):
-        async def abatch(self, ops: Any) -> Any:
-            raise RuntimeError("vector down")
-
     async def _run() -> tuple[Any, Any]:
         cache = build_cache("")
         agent_down = make_agent(FailingStore(), cache)
@@ -206,10 +243,6 @@ def test_persist_turn_stores_and_ignores_failures(clean_env: None) -> None:
         return await store.asearch(memory_namespace("alice"), query="green tea", limit=5)
 
     assert asyncio.run(_run())
-
-    class FailingStore(InMemoryStore):
-        async def abatch(self, ops: Any) -> Any:
-            raise RuntimeError("down")
 
     asyncio.run(persist_turn(FailingStore(), "alice", [HumanMessage(content="hi")]))
 
@@ -268,27 +301,9 @@ def test_production_ignores_transitional_header(
 
 
 def test_set_warms_fallback_when_primary_succeeds(clean_env: None) -> None:
-    from core.cache import InMemoryTTLCache, RecallCache
-
-    class GoodPrimary:
-        def __init__(self) -> None:
-            self.saved: dict[str, str] = {}
-
-        def get_sync(self, key: str) -> str | None:
-            return self.saved.get(key)
-
-        def set_sync(self, key: str, value: str, ttl: int) -> None:
-            self.saved[key] = value
-
-        async def get(self, key: str) -> str | None:
-            return self.saved.get(key)
-
-        async def set(self, key: str, value: str, ttl: int) -> None:
-            self.saved[key] = value
-
     async def _run() -> str | None:
         fallback = InMemoryTTLCache()
-        front = RecallCache(primary=GoodPrimary(), fallback=fallback)
+        front = RecallCache(primary=StubPrimary(), fallback=fallback)
         await front.set("k", "v", 60)
         front.set_sync("k2", "v2", 60)
         assert await fallback.get("k") == "v"
@@ -298,23 +313,8 @@ def test_set_warms_fallback_when_primary_succeeds(clean_env: None) -> None:
 
 
 def test_failing_primary_falls_back(clean_env: None) -> None:
-    from core.cache import InMemoryTTLCache, RecallCache
-
-    class BadPrimary:
-        def get_sync(self, key: str) -> str | None:
-            raise RuntimeError("valkey down")
-
-        def set_sync(self, key: str, value: str, ttl: int) -> None:
-            raise RuntimeError("valkey down")
-
-        async def get(self, key: str) -> str | None:
-            raise RuntimeError("valkey down")
-
-        async def set(self, key: str, value: str, ttl: int) -> None:
-            raise RuntimeError("valkey down")
-
     async def _run() -> tuple[str | None, str | None]:
-        front = RecallCache(primary=BadPrimary(), fallback=InMemoryTTLCache())
+        front = RecallCache(primary=StubPrimary(fail=True), fallback=InMemoryTTLCache())
         await front.set("k", "v", 60)
         front.set_sync("k2", "v2", 60)
         return await front.get("k"), front.get_sync("k2")
@@ -346,8 +346,6 @@ def test_memory_settings_load_from_env(clean_env: None, monkeypatch: pytest.Monk
 
 
 def test_cache_evicts_oldest_beyond_max(clean_env: None) -> None:
-    from core.cache import InMemoryTTLCache
-
     async def _run() -> tuple[str | None, str | None, int]:
         cache = RecallCache(primary=None, fallback=InMemoryTTLCache(max_entries=2))
         await cache.set("k1", "v1", 60)
@@ -387,10 +385,6 @@ def test_cache_close_is_safe_without_server(clean_env: None) -> None:
 
 
 def test_overlong_user_id_degrades_closed(clean_env: None) -> None:
-    from starlette.requests import Request
-
-    from api.deps import get_request_user_id
-
     def _request(uid: str) -> Request:
         return Request(
             {
@@ -411,35 +405,13 @@ def test_overlong_user_id_degrades_closed(clean_env: None) -> None:
 def test_lifespan_closes_cache_on_shutdown(
     clean_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from core.cache import InMemoryTTLCache, RecallCache
-
     closed: list[str] = []
 
-    class RecordingPrimary:
-        def get_sync(self, key: str) -> str | None:
-            return None
-
-        def set_sync(self, key: str, value: str, ttl: int) -> None:
-            return None
-
-        async def get(self, key: str) -> str | None:
-            return None
-
-        async def set(self, key: str, value: str, ttl: int) -> None:
-            return None
-
-        def close_sync(self) -> None:
-            closed.append("sync")
-
-        async def aclose(self) -> None:
-            closed.append("async")
-
-    from services import database
-
-    def _recording(host: str) -> RecallCache:
-        return RecallCache(primary=RecordingPrimary(), fallback=InMemoryTTLCache())
-
-    monkeypatch.setattr(database, "build_cache", _recording)
+    monkeypatch.setattr(
+        database,
+        "build_cache",
+        lambda host: RecallCache(primary=StubPrimary(closed=closed), fallback=InMemoryTTLCache()),
+    )
     with TestClient(create_app()):
         pass
     assert "async" in closed

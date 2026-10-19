@@ -57,15 +57,6 @@ def get_recall_cache(app: FastAPI) -> RecallCache | None:
     return getattr(app.state, "recall_cache", None)
 
 
-def build_loop(
-    checkpointer: Any, store: BaseStore, cache: RecallCache, cache_ttl_seconds: int
-) -> AgentGraph:
-    """Compile the loop with persistence plus recall wired from lifespan resources."""
-    return make_the_agent(
-        checkpointer=checkpointer, store=store, cache=cache, cache_ttl_seconds=cache_ttl_seconds
-    )
-
-
 @asynccontextmanager
 async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Attach the loop with recall on every boot; Postgres upgrades durability.
@@ -98,9 +89,14 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             store = pg_store
         else:
             store = InMemoryStore()
-            
+
         app.state.agent_store = store
-        app.state.agent_graph = build_loop(saver, store, cache, settings.cache_ttl_seconds)
+        app.state.agent_graph = make_the_agent(
+            checkpointer=saver,
+            store=store,
+            cache=cache,
+            cache_ttl_seconds=settings.cache_ttl_seconds,
+        )
         try:
             yield
         finally:
