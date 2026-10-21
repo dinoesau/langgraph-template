@@ -23,7 +23,7 @@ graph TB
 
 Studio is the local client and the HTTP skeleton serves the same loop.
 The dev server loads the `agent` graph declared in `langgraph.json:1`.
-Postgres is optional and only stores checkpoints once the checkpointer lands.
+Postgres is optional; without it the loop stays ephemeral, with it threads persist per thread identifier.
 
 ## Component responsibilities
 

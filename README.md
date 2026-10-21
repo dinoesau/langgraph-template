@@ -12,7 +12,7 @@ Most agent features are planned and the repo ships a tool loop with model fallba
 - Dependencies in `pyproject.toml:1` use uv-only setup with a `src` layout.
 - Commands in `Makefile` wrap `uv sync`, dev server, tests, lint, and format.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
-- Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
+- Example specs in `docs/examples.md:1` describe five agents and only the ReAct tool agent is implemented yet.
 - Tool loop with `graph` plus `state` plus `nodes` plus `routes` runs booking tools, echo stays only when no model keys are set.
 - HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback is live, auth plus observability are planned.
 - Tests in `tests/unit_tests/` cover the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls.

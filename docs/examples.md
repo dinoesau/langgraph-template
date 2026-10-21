@@ -2,7 +2,7 @@
 
 This file specs the five example agents to build in this repo.
 Each one demonstrates a core LangGraph workflow pattern.
-None is implemented yet; build in order, router last.
+Example 1 (ReAct tool agent) is live; examples 2-5 are specs, build in order, router last.
 All examples live under `src/agent/:1`.
 Extra specialists join as subgraph nodes sharing `GraphState` in `src/agent/state.py:1`.
 
