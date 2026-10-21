@@ -3,8 +3,9 @@
 Order defines fallback order. Entries with missing keys are skipped so a
 fresh clone without keys never fails at import time. The starting model
 comes from ``DEFAULT_LLM_MODEL``; fallback reorders circularly per call.
-Raw models run a single attempt each: the service loop owns per-model
-retries, backoff, and the total budget, so provider-level retries stay off.
+Raw models run zero client retries each: the service loop owns per-model
+retries, backoff, and the total budget, so provider-level retries stay off
+(a raw `1` would double every attempt on OpenAI and Anthropic).
 """
 
 from collections.abc import Callable
@@ -71,10 +72,16 @@ def _lazy(
 
 
 def _base_params(settings: Settings) -> dict[str, object]:
-    """Shared provider knobs; single attempt so the service loop owns retries."""
+    """Shared provider knobs; the service loop owns all retries.
+
+    Raw models run zero client retries so each service attempt is exactly
+    one provider call: OpenAI and Anthropic count retries-after-first
+    (1 would double every attempt) and Google treats 0 or 1 as no retries.
+    """
+
     return {
         "temperature": settings.default_llm_temperature,
-        "max_retries": 1,
+        "max_retries": 0,
         "timeout": PROVIDER_TIMEOUT_SECONDS,
     }
 

@@ -16,7 +16,7 @@ from agent.routes import should_continue
 from agent.state import GraphState
 from agent.tools import tools
 from core.config import get_settings
-from services.llm.registry import ModelEntry, build_registry, ordered_registry, rotate
+from services.llm.registry import ModelEntry, _base_params, build_registry, ordered_registry, rotate
 from services.llm.service import LlmService, is_retryable
 
 
@@ -183,6 +183,11 @@ def test_registry_exhausted_raises_clear_error() -> None:
         service.call(_msg("hi"))
 
 
+def test_raw_models_run_zero_client_retries() -> None:
+    """Pin: one provider call per service attempt, no SDK double retry."""
+    assert _base_params(get_settings())["max_retries"] == 0
+
+
 def test_budget_preempts_backoff() -> None:
     import time
 
@@ -198,6 +203,26 @@ def test_budget_preempts_backoff() -> None:
     with pytest.raises(RuntimeError, match="MODEL_UNAVAILABLE"):
         service.call(_msg("hi"))
     assert time.monotonic() - started < 4
+
+
+def test_budget_never_sleeps_past_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fake clock: over-budget backoff stops after one call with zero sleeps."""
+    import time
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(time, "monotonic", lambda: 1000.0)
+    monkeypatch.setattr(time, "sleep", lambda s: sleeps.append(s))
+    service = LlmService(
+        [("m1", FakeRawModel([RuntimeError("503 busy")]))],
+        max_retries=5,
+        total_timeout_seconds=1,
+        backoff_min_seconds=5,
+        backoff_max_seconds=10,
+    )
+    with pytest.raises(RuntimeError, match="MODEL_UNAVAILABLE"):
+        service.call(_msg("hi"))
+    assert service._models[0][1].calls == 1
+    assert sleeps == []
 
 
 def test_structured_output_chain_reapplies_on_retry_and_fallback() -> None:
@@ -219,14 +244,54 @@ def test_async_fallback_parity() -> None:
         first = FakeRawModel([RuntimeError("rate limit 429")] * 5)
         second = FakeRawModel([AIMessage(content="async-ok")])
         service = _zero_backoff_service([("m1", first), ("m2", second)], start="m1")
-        return await service.acall(_msg("hi"), tools)
+        result = await service.acall(_msg("hi"), tools)
+        assert first.calls == 3
+        assert second.calls == 1
+        return result
+
+    async def _fail_fast() -> None:
+        first = FakeRawModel([RuntimeError("bad api key unauthorized")])
+        second = FakeRawModel([AIMessage(content="async-ok")])
+        service = _zero_backoff_service([("m1", first), ("m2", second)])
+        with pytest.raises(RuntimeError, match="unauthorized"):
+            await service.acall(_msg("hi"))
+        assert first.calls == 1
+        assert second.calls == 0
 
     async def _plain() -> Any:
         service = _zero_backoff_service([("m1", FakeRawModel([AIMessage(content="async-ok")]))])
         return await service.acall(_msg("hi"))
 
     assert asyncio.run(_run()).content == "async-ok"
+    asyncio.run(_fail_fast())
     assert asyncio.run(_plain()).content == "async-ok"
+
+
+def test_tools_plus_format_combo_prefers_structured() -> None:
+    """Documents precedence: format chains on the tool-bound model, terminal-only."""
+    model = FakeStructuredModel([ReplySchema(text="combo")])
+    service = _zero_backoff_service([("m1", model)])
+    result = service.call(_msg("hi"), tools, response_format=ReplySchema)
+    assert result == ReplySchema(text="combo")
+    assert model.structured_schemas == [ReplySchema]
+    assert model.bound == tools
+
+
+def test_model_without_bind_tools_skips_binding() -> None:
+    """Duck-typed models without bind_tools pass through unwrapped."""
+
+    class PlainModel:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def invoke(self, messages: Any) -> Any:
+            self.calls += 1
+            return AIMessage(content="plain-ok")
+
+    plain = PlainModel()
+    service = _zero_backoff_service([("m1", plain)])
+    assert service.call(_msg("hi"), tools).content == "plain-ok"
+    assert plain.calls == 1
 
 
 def test_tools_list_shape() -> None:
