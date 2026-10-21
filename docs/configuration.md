@@ -68,7 +68,10 @@ Local runs read `.env`, deployed runs use real environment values.
 | `MAX_LLM_CALL_RETRIES` | `3` | live | Attempts per model before fallback |
 | `LLM_TOTAL_TIMEOUT_SECONDS` | `60` | live | Total budget for the retry plus fallback cycle |
 | `MAX_TOKENS` | planned | planned | Cap per LLM response |
-| `JWT_SECRET_KEY` | planned | planned | Signs auth tokens once the auth layer exists |
+| `JWT_SECRET_KEY` | empty | live | Signs auth tokens, fails closed when empty |
+| `JWT_ALGORITHM` | `HS256` | live | JWT signing algorithm |
+| `JWT_USER_EXPIRE_MINUTES` | `30` | live | User token lifetime in minutes |
+| `JWT_SESSION_EXPIRE_MINUTES` | `60` | live | Session token lifetime in minutes |
 | `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
 
 ## Validation
