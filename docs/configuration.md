@@ -74,6 +74,16 @@ Local runs read `.env`, deployed runs use real environment values.
 | `JWT_SESSION_EXPIRE_MINUTES` | `60` | live | Session token lifetime in minutes |
 | `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
 
+## Rate limits
+
+Register allows 3 requests per minute per IP, login allows 5 per minute per IP.
+Limits are enforced in `src/core/limiter.py:1` with per-process memory storage.
+Session create, chat, rename, and delete carry no limits in this slice: they
+require valid tokens, so brute force is not the threat and abuse control is
+a follow-up. Per-account login throttling is also deferred: keying on the
+form address is infeasible in a sync key function, and IP limits plus argon2
+cost plus generic errors are the spec controls against credential stuffing.
+
 ## Validation
 
 Run `uv run pytest` to confirm the toolchain.

@@ -1,7 +1,8 @@
 """Rate limiting for auth endpoints: per-IP via slowapi.
 
-Memory storage in dev and tests, shared Redis in prod when configured.
-Reset helper keeps per-test isolation without touching internals elsewhere.
+In-memory per-process storage. With N workers the effective limit is N
+times the configured rate. Authenticated routes beyond register plus login
+are unlimited by design in this slice; see docs/configuration.md.
 """
 
 import logging

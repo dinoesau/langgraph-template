@@ -188,6 +188,8 @@ def test_deleted_session_token_chat_is_404(client: TestClient) -> None:
     assert client.post("/api/v1/chat", json={"message": "hi"}, headers=headers).status_code == 404
     listed = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {user_token}"})
     assert listed.json() == []
+
+
 def test_session_token_without_sid_is_403(client: TestClient) -> None:
     secret = "test-secret-0123456789abcdef01234567"
     sidless = create_token("1", "session", None, 30, secret=secret, algorithm="HS256")
@@ -204,6 +206,8 @@ def test_non_int_sub_is_401(client: TestClient) -> None:
     bad_sub = create_token("abc", "user", None, 30, secret=secret, algorithm="HS256")
     response = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {bad_sub}"})
     assert response.status_code == 401
+
+
 def test_register_rate_limited(client: TestClient) -> None:
     for i in range(3):
         response = client.post(
@@ -216,6 +220,7 @@ def test_register_rate_limited(client: TestClient) -> None:
         json={"email": "r3@b.co", "password": "ChangeMe123!", "username": "you"},
     )
     assert limited.status_code == 429
+    assert limited.headers.get("retry-after") == "60"
 
 
 def test_login_rate_limited(client: TestClient) -> None:

@@ -14,7 +14,11 @@ from services.database import agent_lifespan
 
 def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """Return 429 with retry hint when an auth endpoint is over limit."""
-    return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests"},
+        headers={"Retry-After": "60"},
+    )
 
 
 def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
