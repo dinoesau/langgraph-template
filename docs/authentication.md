@@ -1,15 +1,15 @@
 # Authentication
 
-Estado: planeado.
-El flujo JWT y los endpoints aun no estan implementados.
+Estado: live.
+El flujo JWT y los endpoints estan implementados con user tokens y session tokens.
 Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
 
 La capa HTTP vive en `src/api/v1/auth.py:1`.
-La configuracion JWT vivira en `src/core/config.py:1`.
-Los modelos ORM viviran en `src/models/:1`.
-Los esquemas Pydantic viviran en `src/schemas/:1`.
+La configuracion JWT vive en `src/core/config.py:1`.
+Los modelos ORM viven en `src/models/:1`.
+Los esquemas Pydantic viven en `src/schemas/:1`.
 El layout completo esta en `docs/structure.md:22`.
 Nunca expongas modelos ORM directo en la API.
 
@@ -62,7 +62,7 @@ Devuelve `access_token` y `expires_at`.
 
 ```bash
 curl -X POST /api/v1/auth/login \
-  -F "email=you@example.com" \
+  -F "username=you@example.com" \
   -F "password=ChangeMe123!" \
   -F "grant_type=password"
 ```
@@ -98,17 +98,17 @@ Requiere el token de sesion correspondiente.
 Lista todas las sesiones del usuario autenticado.
 Requiere un token de usuario valido.
 
-## Configuracion planeada
+## Configuracion
 
-La clave de firma vivira en `JWT_SECRET_KEY` dentro de `.env.example:1`.
-La expiracion vivira en `JWT_ACCESS_TOKEN_EXPIRE_DAYS` dentro de `src/core/config.py:1`.
+La clave de firma vive en `JWT_SECRET_KEY` dentro de `.env.example:1`.
+La expiracion vive en `JWT_USER_EXPIRE_MINUTES` y `JWT_SESSION_EXPIRE_MINUTES`.
 Usa un valor largo y aleatorio de al menos 32 caracteres en produccion.
 Nunca publiques el contenido de `.env:1`.
 
 ## Notas de seguridad
 
-Los passwords se guardaran con hash bcrypt y nunca en texto plano.
-Cada JWT incluira un reclamo `jti` para que cada token sea unico.
-Todas las entradas de texto se sanitizaran antes de usarse.
+Los passwords se guardan con hash argon2id via pwdlib y nunca en texto plano.
+Cada JWT incluye un reclamo `jti` para que cada token sea unico.
+Las entradas se validan con Pydantic en el borde y el username se normaliza.
 El registro y el login tendran rate limits contra fuerza bruta en `src/core/limiter.py:1`.
 El rate limit es planeado porque `src/core/limiter.py:1` aun no existe.

@@ -4,7 +4,7 @@ This starter gives you a minimal production-minded base for LangGraph agents.
 It keeps the deploy contract small so you can grow the codebase step by step.
 It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
-Most agent features are planned and the repo ships a tool loop with model fallback plus HTTP chat.
+Most agent features are planned and the repo ships a tool loop with model fallback plus HTTP chat with auth.
 
 ## What's included
 
@@ -14,7 +14,7 @@ Most agent features are planned and the repo ships a tool loop with model fallba
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and only the ReAct tool agent is implemented yet.
 - Tool loop with `graph` plus `state` plus `nodes` plus `routes` runs booking tools, echo stays only when no model keys are set.
-- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback is live, auth plus observability are planned.
+- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback plus auth lifecycle is live, observability is planned.
 - Tests in `tests/unit_tests/` cover the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
@@ -34,7 +34,7 @@ uv run pytest
 
 The dev server entry comes from `langgraph.json:1`.
 The graph module runs the `recall` to `chat` to `tools` loop and the dev server loads it.
-The HTTP skeleton serves on `:8000` with `GET /api/v1/health` and `POST /api/v1/chat`.
+The HTTP skeleton serves on `:8000` with `GET /api/v1/health` and `POST /api/v1/chat` (session token required).
 Use `Makefile` when you prefer short targets for the same uv commands.
 Read `docs/structure.md:1` before adding new files so the layout stays small.
 
@@ -47,7 +47,7 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 | [Examples](docs/examples.md) | Example agent specs to build |
 | [Architecture](docs/architecture.md) | System design and request flow |
 | [Configuration](docs/configuration.md) | Environment variables and defaults |
-| [Authentication](docs/authentication.md) | Planned JWT flow and sessions |
+| [Authentication](docs/authentication.md) | JWT flow and sessions |
 | [Database](docs/database.md) | Planned schema, migrations, and pgvector |
 | [LLM Service](docs/llm-service.md) | Model registry, retries, and circular fallback |
 | [Memory](docs/memory.md) | Planned long-term memory and cache |
