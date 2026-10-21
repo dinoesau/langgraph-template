@@ -19,6 +19,7 @@ from agent.graph import graph, make_the_agent
 from api.app import create_app
 from core.cache import InMemoryTTLCache, RecallCache, build_cache
 from core.config import get_settings
+from core.limiter import reset_limiter
 from core.memory import build_memory_key, format_recall, memory_namespace
 from services import database
 from services.auth_security import decode_token
@@ -33,6 +34,7 @@ def clean_env_fixture(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, 
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-0123456789abcdef01234567")
     get_settings.cache_clear()
+    reset_limiter()
     yield
     get_settings.cache_clear()
 

@@ -115,8 +115,8 @@ Nunca publiques el contenido de `.env:1`.
 Los passwords se guardan con hash argon2id via pwdlib y nunca en texto plano.
 Cada JWT incluye un reclamo `jti` para que cada token sea unico.
 Las entradas se validan con Pydantic en el borde y el username se normaliza.
-El registro y el login tendran rate limits contra fuerza bruta en `src/core/limiter.py:1`.
-El rate limit es planeado porque `src/core/limiter.py:1` aun no existe.
+El registro y el login tienen rate limits contra fuerza bruta en `src/core/limiter.py:1`.
+El registro permite 3 intentos por minuto y el login 5 por minuto por IP.
 
 ## Caveats
 

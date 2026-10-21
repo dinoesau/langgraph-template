@@ -2,13 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import SessionContext, get_db, require_scope
 from core.config import Settings, get_settings
+from core.limiter import limiter
 from schemas.auth import RegisterIn, RenameIn, SessionInfo, SessionOut, TokenOut
 from services.auth_security import ahash_password, create_token, decode_token
 from services.auth_store import (
@@ -71,7 +72,9 @@ def _require_session_match(ctx: SessionContext, session_id: str) -> None:
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
 async def register(
+    request: Request,
     body: RegisterIn,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenOut:
@@ -94,7 +97,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenOut)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenOut:

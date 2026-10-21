@@ -17,6 +17,7 @@ from agent.graph import make_the_agent
 from api.app import create_app
 from core.cache import build_cache
 from core.config import get_settings
+from core.limiter import reset_limiter
 
 
 @asynccontextmanager
@@ -54,6 +55,7 @@ def client_fixture(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[TestClient
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-0123456789abcdef01234567")
     monkeypatch.setenv("POSTGRES_URI", "")
     get_settings.cache_clear()
+    reset_limiter()
     app = create_app(lifespan=auth_memory_lifespan)
     with TestClient(app) as client:
         yield client, app

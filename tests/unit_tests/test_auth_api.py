@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from core.config import get_settings
+from core.limiter import reset_limiter
 from services.auth_security import create_token
 
 
@@ -15,6 +16,7 @@ def client_fixture(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-0123456789abcdef01234567")
     monkeypatch.setenv("POSTGRES_URI", "")
     get_settings.cache_clear()
+    reset_limiter()
     app = create_app()
     with TestClient(app) as client:
         yield client
@@ -186,8 +188,6 @@ def test_deleted_session_token_chat_is_404(client: TestClient) -> None:
     assert client.post("/api/v1/chat", json={"message": "hi"}, headers=headers).status_code == 404
     listed = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {user_token}"})
     assert listed.json() == []
-
-
 def test_session_token_without_sid_is_403(client: TestClient) -> None:
     secret = "test-secret-0123456789abcdef01234567"
     sidless = create_token("1", "session", None, 30, secret=secret, algorithm="HS256")
@@ -204,3 +204,30 @@ def test_non_int_sub_is_401(client: TestClient) -> None:
     bad_sub = create_token("abc", "user", None, 30, secret=secret, algorithm="HS256")
     response = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {bad_sub}"})
     assert response.status_code == 401
+def test_register_rate_limited(client: TestClient) -> None:
+    for i in range(3):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={"email": f"r{i}@b.co", "password": "ChangeMe123!", "username": "you"},
+        )
+        assert response.status_code == 201
+    limited = client.post(
+        "/api/v1/auth/register",
+        json={"email": "r3@b.co", "password": "ChangeMe123!", "username": "you"},
+    )
+    assert limited.status_code == 429
+
+
+def test_login_rate_limited(client: TestClient) -> None:
+    _register(client, "l@b.co")
+    for _ in range(5):
+        response = client.post(
+            "/api/v1/auth/login",
+            data={"username": "l@b.co", "password": "ChangeMe123!", "grant_type": "password"},
+        )
+        assert response.status_code == 200
+    limited = client.post(
+        "/api/v1/auth/login",
+        data={"username": "l@b.co", "password": "ChangeMe123!", "grant_type": "password"},
+    )
+    assert limited.status_code == 429
