@@ -7,7 +7,6 @@ from typing import Any, TypeVar
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from models.base import Base
-from models.session import Session
 from models.user import User
 from services.auth_security import hash_password
 from services.auth_store import (

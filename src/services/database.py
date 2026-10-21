@@ -81,10 +81,17 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from models.base import Base
     from services.auth_store import auth_session_factory, create_auth_engine
 
-    auth_engine = create_auth_engine(postgres_uri or "sqlite:///:memory:")
+    if not settings.jwt_secret_key.strip():
+        raise RuntimeError("JWT_SECRET_KEY must be set to serve auth")
+    auth_engine = create_auth_engine(
+        postgres_uri or "sqlite:///:memory:",
+        pool_size=settings.postgres_pool_max_size,
+    )
     if "sqlite" in str(auth_engine.url):
         async with auth_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+    async with auth_engine.connect():
+        pass
     app.state.auth_engine = auth_engine
     app.state.auth_session_factory = auth_session_factory(auth_engine)
     async with AsyncExitStack() as stack:

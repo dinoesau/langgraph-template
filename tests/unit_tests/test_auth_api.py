@@ -67,6 +67,22 @@ def test_register_duplicate_is_409(client: TestClient) -> None:
     assert dup.status_code == 409
 
 
+def test_register_race_is_409(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    import api.v1.auth as auth_module
+
+    async def _raise(*args: object, **kwargs: object) -> object:
+        raise IntegrityError("INSERT", {}, Exception("boom"))
+
+    monkeypatch.setattr(auth_module, "create_user", _raise)
+    dup = client.post(
+        "/api/v1/auth/register",
+        json={"email": "race@b.co", "password": "ChangeMe123!", "username": "you"},
+    )
+    assert dup.status_code == 409
+
+
 def test_login_bad_password_is_401(client: TestClient) -> None:
     _register(client)
     bad = client.post(

@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
@@ -83,6 +83,15 @@ def _auth_challenge(scope: str = "") -> dict[str, str]:
     return {"WWW-Authenticate": value}
 
 
+def _unauthorized(scope_str: str) -> NoReturn:
+    """Raise 401 with a scope-echo challenge."""
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers=_auth_challenge(scope_str),
+    )
+
+
 def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
     """Return a dependency enforcing one OAuth2 scope plus sid binding."""
 
@@ -93,13 +102,13 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
     ) -> SessionContext:
         settings = get_settings()
         try:
-            data = decode_token(token, secret=settings.jwt_secret_key)
+            data = decode_token(
+                token,
+                secret=settings.jwt_secret_key,
+                algorithms=[settings.jwt_algorithm],
+            )
         except InvalidTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers=_auth_challenge(security_scopes.scope_str),
-            ) from None
+            _unauthorized(security_scopes.scope_str)
         if required not in data.scopes:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -109,18 +118,10 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
         try:
             user_id = int(data.sub)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers=_auth_challenge(security_scopes.scope_str),
-            ) from None
+            _unauthorized(security_scopes.scope_str)
         if required == "user":
             if await get_user_by_id(db, user_id) is None:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Could not validate credentials",
-                    headers=_auth_challenge(security_scopes.scope_str),
-                )
+                _unauthorized(security_scopes.scope_str)
             return SessionContext(user_id=data.sub)
         if not data.sid:
             raise HTTPException(

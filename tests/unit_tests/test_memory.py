@@ -32,6 +32,7 @@ def clean_env_fixture(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, 
     monkeypatch.setenv("POSTGRES_URI", "")
     monkeypatch.setenv("VALKEY_HOST", "")
     monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-0123456789abcdef01234567")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
