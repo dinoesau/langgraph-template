@@ -49,7 +49,7 @@ Las tablas del store `store`, `store_vectors` y `store_migrations` las gestiona 
 
 La persistencia usa `AsyncPostgresSaver` con un hilo por `thread_id`.
 El grafo recibe el checkpointer por fabrica y nunca lo importa directo.
-El patron es `make_the_agent(checkpointer, store, cache)` segun `docs/structure.md:140`.
+El patron es `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` segun `docs/structure.md:140`.
 El checkpointer mas el store se proveen como dependencia de lifespan desde `src/services/database.py:1`.
 Sin `POSTGRES_URI` el loop sigue efimero; con la variable puesta el arranque falla si el store no responde.
 Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.

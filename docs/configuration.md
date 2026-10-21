@@ -63,8 +63,10 @@ Local runs read `.env`, deployed runs use real environment values.
 | `APP_PORT` | `8000` | live | Port for the local HTTP server |
 | `CACHE_TTL_SECONDS` | `60` | live | Memory search cache TTL |
 | `VALKEY_HOST` | empty | live | Enables shared cache; empty keeps in-memory fallback |
-| `DEFAULT_LLM_MODEL` | planned | planned | Starting model for the chat node |
-| `DEFAULT_LLM_TEMPERATURE` | planned | planned | Sampling temperature for chat completions |
+| `DEFAULT_LLM_MODEL` | `default-openai` | live | Starting model for the chat node |
+| `DEFAULT_LLM_TEMPERATURE` | `0.2` | live | Sampling temperature for chat completions |
+| `MAX_LLM_CALL_RETRIES` | `3` | live | Attempts per model before fallback |
+| `LLM_TOTAL_TIMEOUT_SECONDS` | `60` | live | Total budget for the retry plus fallback cycle |
 | `MAX_TOKENS` | planned | planned | Cap per LLM response |
 | `JWT_SECRET_KEY` | planned | planned | Signs auth tokens once the auth layer exists |
 | `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |

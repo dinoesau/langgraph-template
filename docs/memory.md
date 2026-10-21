@@ -8,7 +8,7 @@ This guide describes the shipped behavior plus the target design.
 
 Short term state lives in the graph checkpointer.
 `GraphState` in `src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-Graphs use `make_the_agent(checkpointer, store, cache)` with `AsyncPostgresSaver` plus a LangGraph `BaseStore` per `docs/structure.md:140`.
+Graphs use `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` plus a LangGraph `BaseStore` per `docs/structure.md:140`.
 Nodes read recall through `get_store` with the per-user namespace `("memories", user_id)`, sync search on the sync path and async search on the async path.
 Recall is injected as `docs` on `invoke`, `ainvoke` and `astream` alike when a caller id is present.
 The lifespan builds the store with or without Postgres: `InMemoryStore` for fresh clones, pooled `AsyncPostgresStore` with `setup` when `POSTGRES_URI` is set.

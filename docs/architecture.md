@@ -1,7 +1,7 @@
 # Architecture
 
 This doc shows how the starter fits together today and where it grows next.
-An echo loop plus HTTP chat are live, the remaining blocks are marked as planned.
+A tool loop with model fallback plus HTTP chat are live, auth plus observability stay planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -9,13 +9,13 @@ The layout follows the spec in `docs/structure.md:1`.
 ```mermaid
 graph TB
     Studio["Studio (browser)"] --> Dev["Dev server"]
-    Dev --> Graph["Graph (echo loop)"]
-    Graph --> Echo["echo node"]
-    Graph --> Chat["chat node (planeado)"]
-    Graph --> ToolCall["tool_call node (planeado)"]
+    Dev --> Graph["Graph (tool loop)"]
+    Graph --> Recall["recall node"]
+    Recall --> Chat["chat node"]
+    Chat --> Tools["tools node"]
+    Tools --> Chat
     Chat --> LLM["LLM provider"]
-    ToolCall --> Tools["tools (planeado)"]
-    Graph <--> Ckpt["Checkpointer (planeado)"]
+    Graph <--> Ckpt["Checkpointer"]
     Ckpt --> PG[("PostgreSQL (opcional)")]
     Graph --> API["HTTP API (skeleton)"]
     Cfg["Config (live)"] -.-> Graph
@@ -31,20 +31,20 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | --- | --- | --- | --- |
 | Deploy contract | `langgraph.json:1` | Existe | Maps the `agent` name to the graph variable and points env to `.env` |
 | Package state | `src/agent/state.py:1` | Existe | Defines `GraphState` as the single source of truth |
-| Graph wiring | `src/agent/graph.py:1` | Existe | Echo loop exports `graph` with recall via `get_store` plus cache, `chat` to `tool_call` arrives with the tool-calling loop |
-| Nodes | `src/agent/nodes.py:1` | Planeado | Runs LLM and tool calls and returns partial state updates |
-| Tools | `src/agent/tools/:1` | Planeado | Holds one capability module per file behind a shared list |
-| Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
+| Graph wiring | `src/agent/graph.py:37` | Existe | Recall mas `chat` a `tools` con `ToolNode`, echo solo sin llm |
+| Nodes | `src/agent/nodes.py:142` | Existe | Recall una vez por turno mas chat via fallback con echo sin llm |
+| Tools | `src/agent/tools/:1` | Existe | Booking con `get_availability` mas `book_appointment` detras de lista compartida |
+| Routes | `src/agent/routes.py:14` | Existe | `should_continue` delega en `tools_condition`, puro de `tool_calls` al siguiente nodo |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
 | HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls with transitional `X-User-ID`, auth arrives with the auth lifecycle |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Cache | `src/core/cache.py:1` | Existe | Valkey front with in-memory TTL fallback for recall |
 | Memory | `src/services/memory.py:1` | Existe | Per-user namespaces plus extract plus background writer over `BaseStore` |
-| Services | `src/services/:1` | Parcial | Database access exists, LLM fallback stays planned |
+| Services | `src/services/:1` | Existe | Database mas memory mas LLM fallback con retries y circular |
 | Checkpointer | AsyncPostgresSaver | Existe | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs local pgvector on port 5432 plus Valkey on port 6379 |
-| Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus settings plus HTTP plus memory isolation without model calls |
+| Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls |
 
 ### Clean architecture rings
 
@@ -59,38 +59,40 @@ Dependencies point inward; handlers resolve the loop through the `api/deps` Depe
 
 ![Clean architecture target with all planned modules](clean-architecture-target.svg)
 
-Target is the destination map verified 2026-10-18: `GraphState` keeps the `MessagesState` tradeoff until the tool loop replaces echo, recall runs on `invoke` plus `ainvoke` plus `astream` when the lifespan-wired graph serves the turn with transitional `X-User-ID`.
+Target is the destination map verified 2026-10-21: `GraphState` keeps the `MessagesState` tradeoff while the tool loop owns `recall` plus `chat` plus `tools`, recall runs on `invoke` plus `ainvoke` plus `astream` when the lifespan-wired graph serves the turn with transitional `X-User-ID`.
 
 ## Request lifecycle
 
-The echo lifecycle is live and the full tool loop arrives later.
+The tool loop lifecycle is live with echo fallback when no model keys are set.
 Each step below runs in order for one user message.
 
 1. Studio sends a user message to the dev server.
 2. The dev server loads the `agent` graph from `langgraph.json:1`.
-3. The `echo` node loads per-user recall as `docs` when a caller id is present, with no model call.
-4. The graph ends the turn with no tool calls.
-5. The checkpointer persists state per thread in Postgres when the lifespan provides it; without Postgres the loop stays ephemeral with in-memory recall. Persisted graphs require the async serving path because `AsyncPostgresSaver` is async-only.
-6. Memory extraction plus store runs as Starlette background tasks after the reply without slowing the chat path.
-7. The final message returns to Studio.
+3. The `recall` node loads per-user recall as `docs` once per turn when a caller id is present, with no model call.
+4. The `chat` node answers through the model fallback, or echoes the last human text when no llm is wired.
+5. When the reply carries `tool_calls`, the `tools` node runs them and feeds results back to `chat` until no calls remain.
+6. The checkpointer persists state per thread in Postgres when the lifespan provides it; without Postgres the loop stays ephemeral with in-memory recall. Persisted graphs require the async serving path because `AsyncPostgresSaver` is async-only.
+7. Memory extraction plus store runs as Starlette background tasks after the reply without slowing the chat path.
+8. The final message returns to Studio.
 
 Auth and rate limits are planned with `src/api/` and `src/services/`; recall uses transitional `X-User-ID` until session tokens land, and production ignores that header.
 
 ## Agent graph
 
-The repo ships a one-node echo loop and the two-node loop below arrives with tool calling.
+The repo ships the tool loop below, with echo fallback when no model keys are set.
 
 ```mermaid
 graph LR
-    START --> echo
-    echo --> END
-    chat["chat (planeado)"]
-    tool_call["tool_call (planeado)"]
+    START --> recall
+    recall --> chat
+    chat --> tools
+    tools --> chat
+    chat --> END
 ```
 
-The `echo` node answers with the last human text and no model call.
-The `chat` node answers or requests tool calls once the tool-calling loop exists.
-The `tool_call` node runs tools concurrently and feeds results back to `chat` once it exists.
+The `recall` node loads per-user recall once per turn.
+The `chat` node answers through the fallback or echoes with no llm wired.
+The `tools` node runs tool calls concurrently and feeds results back to `chat`.
 The loop ends when the reply carries no tool calls.
 
 ## Growth path
