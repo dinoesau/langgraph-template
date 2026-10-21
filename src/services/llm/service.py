@@ -68,6 +68,7 @@ def is_retryable(error: Exception) -> bool:
         return True
     if isinstance(error, TimeoutError | ConnectionError):
         return True
+    logger.debug("llm unknown error shape, retrying: %s", error)
     return True
 
 
