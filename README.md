@@ -13,9 +13,9 @@ Most agent features are planned and the repo ships an echo loop with HTTP chat.
 - Commands in `Makefile` wrap `uv sync`, dev server, tests, lint, and format.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
-- Echo loop with `graph` plus `state` answers greetings without models, tools arrive with the tool-calling loop.
-- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes is live, LLM fallback plus auth plus observability are planned.
-- Tests in `tests/unit_tests/` cover the loop plus settings plus HTTP plus memory isolation without model calls.
+- Tool loop with `graph` plus `state` plus `nodes` plus `routes` runs booking tools, echo stays only when no model keys are set.
+- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback is live, auth plus observability are planned.
+- Tests in `tests/unit_tests/` cover the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
 ## Quickstart

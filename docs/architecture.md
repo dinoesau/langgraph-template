@@ -31,17 +31,17 @@ Postgres is optional and only stores checkpoints once the checkpointer lands.
 | --- | --- | --- | --- |
 | Deploy contract | `langgraph.json:1` | Existe | Maps the `agent` name to the graph variable and points env to `.env` |
 | Package state | `src/agent/state.py:1` | Existe | Defines `GraphState` as the single source of truth |
-| Graph wiring | `src/agent/graph.py:1` | Existe | Echo loop exports `graph` with recall via `get_store` plus cache, `chat` to `tool_call` arrives with the tool-calling loop |
-| Nodes | `src/agent/nodes.py:1` | Planeado | Runs LLM and tool calls and returns partial state updates |
-| Tools | `src/agent/tools/:1` | Planeado | Holds one capability module per file behind a shared list |
-| Routes | `src/agent/routes.py:1` | Planeado | Keeps pure routing from state to the next node name |
+| Graph wiring | `src/agent/graph.py:1` | Existe | Recall mas `chat` a `tool_call` con `ToolNode`, echo solo sin llm |
+| Nodes | `src/agent/nodes.py:1` | Existe | Recall una vez por turno mas chat via fallback con echo sin llm |
+| Tools | `src/agent/tools/:1` | Existe | Booking con `get_availability` mas `book_appointment` mas `get_order_status` detras de lista compartida |
+| Routes | `src/agent/routes.py:1` | Existe | `should_continue` puro de `tool_calls` al siguiente nodo |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
 | HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls with transitional `X-User-ID`, auth arrives with the auth lifecycle |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Cache | `src/core/cache.py:1` | Existe | Valkey front with in-memory TTL fallback for recall |
 | Memory | `src/services/memory.py:1` | Existe | Per-user namespaces plus extract plus background writer over `BaseStore` |
-| Services | `src/services/:1` | Parcial | Database access exists, LLM fallback stays planned |
+| Services | `src/services/:1` | Existe | Database mas memory mas LLM fallback con retries y circular |
 | Checkpointer | AsyncPostgresSaver | Existe | Persists full state per thread for resume and multi-turn memory |
 | Storage | `docker-compose.yml:2` | Existe | Runs local pgvector on port 5432 plus Valkey on port 6379 |
 | Tests | `tests/unit_tests/:1` | Existe | Covers the loop plus settings plus HTTP plus memory isolation without model calls |
