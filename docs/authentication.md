@@ -38,14 +38,14 @@ El token de usuario identifica a la persona y sirve para crear y listar sesiones
 El token de sesion identifica una conversacion y sera obligatorio en los endpoints de chat.
 Ambos seran JWT firmados con HS256 y expiracion configurable.
 
-## Endpoints planeados
+## Endpoints
 
 ### `POST /api/v1/auth/register`
 
 Crea una cuenta nueva con email, password y username opcional.
-Devuelve `user_id`, `email`, `username`, `access_token` y `expires_at` como el login.
-El password requerira 8 o mas caracteres con mayuscula, minuscula, numero y simbolo.
-El username se pasara al system prompt para personalizar las respuestas.
+Devuelve `access_token` y `expires_at` (201).
+El password requiere 8 a 128 caracteres con mayuscula, minuscula, numero y simbolo.
+El username se guarda en la sesion para personalizar las respuestas.
 
 ```json
 {
@@ -85,18 +85,22 @@ Requiere el token de sesion correspondiente.
 ```bash
 curl -X PATCH /api/v1/auth/session/{session_id}/name \
   -H "Authorization: Bearer <session token>" \
-  -F "name=My research session"
+  -H 'Content-Type: application/json' \
+  -d '{"name": "My research session"}'
 ```
 
 ### `DELETE /api/v1/auth/session/{session_id}`
 
-Elimina una sesion y su historial de chat.
+Elimina la fila de sesion y revoca su token (las filas ya no listan).
 Requiere el token de sesion correspondiente.
+El hilo del loop y los recuerdos no se purgan: los chats con el token
+borrado responden 404 y la memoria sigue aislada por usuario.
 
 ### `GET /api/v1/auth/sessions`
 
 Lista todas las sesiones del usuario autenticado.
 Requiere un token de usuario valido.
+Sin paginacion por diseno en esta ronda: una fila por conversacion.
 
 ## Configuracion
 
@@ -112,3 +116,9 @@ Cada JWT incluye un reclamo `jti` para que cada token sea unico.
 Las entradas se validan con Pydantic en el borde y el username se normaliza.
 El registro y el login tendran rate limits contra fuerza bruta en `src/core/limiter.py:1`.
 El rate limit es planeado porque `src/core/limiter.py:1` aun no existe.
+
+## Caveats
+
+- Sin revocacion: los tokens valen hasta `exp`; no hay denylist, `jti` solo garantiza unicidad.
+- Limites por proceso: el rate limit es en memoria por instancia, con N replicas el limite efectivo es N veces.
+- Borrado retiene hilos: `DELETE /session` elimina la fila y revoca el token, no purga el hilo del loop ni la memoria.

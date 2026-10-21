@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from core.config import get_settings
+from services.auth_security import create_token
 
 
 @pytest.fixture(name="client")
@@ -152,3 +153,34 @@ def test_challenge_only_on_401(client: TestClient) -> None:
     )
     assert forbidden.status_code == 403
     assert "www-authenticate" not in forbidden.headers
+def test_expired_token_is_401(client: TestClient) -> None:
+    secret = "test-secret-0123456789abcdef01234567"
+    expired = create_token("1", "user", None, -1, secret=secret, algorithm="HS256")
+    response = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {expired}"})
+    assert response.status_code == 401
+
+
+def test_tampered_token_is_401(client: TestClient) -> None:
+    user_token = _register(client)
+    tampered = user_token[:-2] + ("ab" if not user_token.endswith("ab") else "cd")
+    response = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {tampered}"})
+    assert response.status_code == 401
+
+
+def test_session_token_on_user_route_is_403(client: TestClient) -> None:
+    user_token = _register(client)
+    _, session_token = _session(client, user_token)
+    response = client.get(
+        "/api/v1/auth/sessions", headers={"Authorization": f"Bearer {session_token}"}
+    )
+    assert response.status_code == 403
+
+
+def test_deleted_session_token_chat_is_404(client: TestClient) -> None:
+    user_token = _register(client)
+    session_id, session_token = _session(client, user_token)
+    headers = {"Authorization": f"Bearer {session_token}"}
+    assert client.delete(f"/api/v1/auth/session/{session_id}", headers=headers).status_code == 204
+    assert client.post("/api/v1/chat", json={"message": "hi"}, headers=headers).status_code == 404
+    listed = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {user_token}"})
+    assert listed.json() == []

@@ -80,7 +80,7 @@ Grow into `src/api/` and `src/services/` only when shipping to users.
 
 **Is this ready to deploy today?**
 No.
-The deploy contract maps to the tool loop, auth plus observability plus evals are still planned.
+The deploy contract maps to the tool loop, auth is live, observability plus evals are still planned.
 
 **How do I add the first agent?**
 Follow `docs/structure.md:1` for file roles.

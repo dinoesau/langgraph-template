@@ -4,7 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Security
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
@@ -68,17 +68,22 @@ async def _stream_loop(
     box["reply"] = "".join(texts)
 
 
+def _session_thread(ctx: SessionContext) -> str:
+    """Return the server-authoritative thread for one session context."""
+    assert ctx.session_id is not None
+    return ctx.session_id
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
-    ctx: Annotated[SessionContext, Depends(require_scope("session"))],
+    ctx: Annotated[SessionContext, Security(require_scope("session"), scopes=["session"])],
     agent: Annotated[AgentGraph, Depends(get_request_graph)],
     writer: Annotated[WriterHook, Depends(get_memory_writer)],
     background: BackgroundTasks,
 ) -> ChatResponse:
     """Delegate one turn to the loop on the session thread."""
-    assert ctx.session_id is not None
-    thread_id = ctx.session_id
+    thread_id = _session_thread(ctx)
     reply = await _invoke_loop(agent, body.message, thread_id, ctx.user_id)
     background.add_task(writer, ctx.user_id, snapshot_messages(body.message, reply))
     return ChatResponse(reply=reply, thread_id=thread_id)
@@ -87,13 +92,12 @@ async def chat(
 @router.post("/chat/stream")
 def chat_stream(
     body: ChatRequest,
-    ctx: Annotated[SessionContext, Depends(require_scope("session"))],
+    ctx: Annotated[SessionContext, Security(require_scope("session"), scopes=["session"])],
     agent: Annotated[AgentGraph, Depends(get_request_graph)],
     writer: Annotated[WriterHook, Depends(get_memory_writer)],
 ) -> StreamingResponse:
     """Delegate one turn to the loop, stream it on the session thread."""
-    assert ctx.session_id is not None
-    thread_id = ctx.session_id
+    thread_id = _session_thread(ctx)
     user_id = ctx.user_id
     box: dict[str, str] = {}
 
