@@ -78,6 +78,15 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         llm: Any | None = LlmService.from_settings(settings)
     except ValueError:
         llm = None
+    from models.base import Base
+    from services.auth_store import auth_session_factory, create_auth_engine
+
+    auth_engine = create_auth_engine(postgres_uri or "sqlite:///:memory:")
+    if "sqlite" in str(auth_engine.url):
+        async with auth_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    app.state.auth_engine = auth_engine
+    app.state.auth_session_factory = auth_session_factory(auth_engine)
     async with AsyncExitStack() as stack:
         saver: Any = None
         store: BaseStore
@@ -109,3 +118,4 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         finally:
             cache.close_sync()
             await cache.aclose()
+            await auth_engine.dispose()
