@@ -24,6 +24,11 @@ def test_register_rejects_short_password() -> None:
         RegisterIn(email="a@b.co", password=SecretStr("Aa1!"), username=None)
 
 
+def test_register_rejects_overlong_password() -> None:
+    with pytest.raises(ValidationError):
+        RegisterIn(email="a@b.co", password=SecretStr("Aa1!" + "x" * 125), username=None)
+
+
 def test_register_blank_username_becomes_none() -> None:
     body = RegisterIn(email="a@b.co", password=SecretStr("ChangeMe123!"), username="   ")
     assert body.username is None

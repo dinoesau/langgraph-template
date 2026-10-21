@@ -13,7 +13,23 @@ from pwdlib import PasswordHash
 from pydantic import BaseModel
 
 password_hash = PasswordHash.recommended()
-DUMMY_HASH = password_hash.hash("dummy-password-Aa1!")
+
+_dummy_hash: str | None = None
+
+
+def _dummy_hash_value() -> str:
+    """Return the timing-mitigation hash, computing it once on first use."""
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = password_hash.hash("dummy-password-Aa1!")
+    return _dummy_hash
+
+
+def __getattr__(name: str) -> str:
+    """Serve DUMMY_HASH lazily so imports skip one argon2 hash."""
+    if name == "DUMMY_HASH":
+        return _dummy_hash_value()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class TokenData(BaseModel):
@@ -33,7 +49,10 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Return true when one clear password matches its stored hash."""
-    return password_hash.verify(plain, hashed)
+    try:
+        return bool(password_hash.verify(plain, hashed))
+    except Exception:  # noqa: BLE001 - corrupt hashes must fail closed, not 500
+        return False
 
 
 def create_token(
@@ -75,7 +94,6 @@ def decode_token(token: str, *, secret: str, algorithms: list[str] | None = None
 
 
 __all__ = [
-    "DUMMY_HASH",
     "InvalidTokenError",
     "TokenData",
     "create_token",

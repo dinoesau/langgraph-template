@@ -30,6 +30,8 @@ class RegisterIn(BaseModel):
     @classmethod
     def _strong_password(cls, value: SecretStr) -> SecretStr:
         secret = value.get_secret_value()
+        if len(secret) > 128:
+            raise ValueError("password must not exceed 128 characters")
         if not _PASSWORD_RE.match(secret):
             raise ValueError("password must be 8 plus upper plus lower plus digit plus symbol")
         return value

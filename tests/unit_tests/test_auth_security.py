@@ -65,3 +65,7 @@ def test_wrong_secret_rejected() -> None:
     token = create_token("1", "user", None, 30, secret=_SECRET, algorithm=_ALGO)
     with pytest.raises(InvalidTokenError):
         decode_token(token, secret="other-secret-0123456789abcdef01234567")
+
+
+def test_malformed_hash_verifies_false() -> None:
+    assert not verify_password("anything", "not-a-valid-hash")

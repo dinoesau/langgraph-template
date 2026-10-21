@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     llm_total_timeout_seconds: int = Field(default=60, ge=5, le=600)
     # Auth lifecycle (S4). Empty secret fails closed at token creation.
     jwt_secret_key: str = ""
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_user_expire_minutes: int = Field(default=30, ge=5, le=1440)
     jwt_session_expire_minutes: int = Field(default=60, ge=5, le=1440)
 
