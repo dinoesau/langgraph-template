@@ -15,10 +15,11 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import StaticPool
 
 from models.session import Session
 from models.user import User
-from services.auth_security import DUMMY_HASH, verify_password
+from services.auth_security import verify_password
 
 
 @dataclass(frozen=True)
@@ -53,9 +54,16 @@ def normalize_auth_url(raw: str) -> str:
     return uri
 
 
-def create_auth_engine(url: str) -> AsyncEngine:
+def create_auth_engine(url: str, pool_size: int = 5, max_overflow: int = 10) -> AsyncEngine:
     """Build one async engine for user plus session rows."""
-    return create_async_engine(normalize_auth_url(url))
+    normalized = normalize_auth_url(url)
+    if ":memory:" in normalized:
+        return create_async_engine(
+            normalized,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    return create_async_engine(normalized, pool_size=pool_size, max_overflow=max_overflow)
 
 
 def auth_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
@@ -85,10 +93,15 @@ async def create_user(db: AsyncSession, email: str, username: str | None, pw_has
     return _to_user_dto(user)
 
 
+async def _fetch_user_row(db: AsyncSession, email: str) -> User | None:
+    """Return one user row by email for auth checks."""
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+
 async def get_user_by_email(db: AsyncSession, email: str) -> UserDTO | None:
     """Return one user by email or None when missing."""
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    user = await _fetch_user_row(db, email)
     return _to_user_dto(user) if user is not None else None
 
 
@@ -101,8 +114,9 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> UserDTO | None:
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> UserDTO | None:
     """Check credentials with timing mitigation, None on any failure."""
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
+    from services.auth_security import DUMMY_HASH
+
+    user = await _fetch_user_row(db, email)
     if user is None:
         verify_password(password, DUMMY_HASH)
         return None
@@ -121,7 +135,9 @@ async def create_session(db: AsyncSession, user_id: int, username: str | None) -
 
 async def list_sessions(db: AsyncSession, user_id: int) -> list[SessionDTO]:
     """List caller sessions ordered by creation."""
-    result = await db.execute(select(Session).where(Session.user_id == user_id))
+    result = await db.execute(
+        select(Session).where(Session.user_id == user_id).order_by(Session.created_at, Session.id)
+    )
     return [_to_session_dto(row) for row in result.scalars().all()]
 
 
@@ -132,13 +148,21 @@ async def get_session(db: AsyncSession, session_id: str) -> SessionDTO | None:
     return _to_session_dto(session) if session is not None else None
 
 
+async def _owned_session(db: AsyncSession, user_id: int, session_id: str) -> Session | None:
+    """Return one session when owned by the caller, else None."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if session is None or session.user_id != user_id:
+        return None
+    return session
+
+
 async def rename_session(
     db: AsyncSession, user_id: int, session_id: str, name: str
 ) -> SessionDTO | None:
     """Rename one owned session, None when missing or not owned."""
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    session = result.scalar_one_or_none()
-    if session is None or session.user_id != user_id:
+    session = await _owned_session(db, user_id, session_id)
+    if session is None:
         return None
     session.name = name
     await db.flush()
@@ -146,10 +170,9 @@ async def rename_session(
 
 
 async def delete_session(db: AsyncSession, user_id: int, session_id: str) -> bool:
-    """Delete one owned session, false when missing or not owned."""
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    session = result.scalar_one_or_none()
-    if session is None or session.user_id != user_id:
+    """Delete one owned session row, false when missing or not owned."""
+    session = await _owned_session(db, user_id, session_id)
+    if session is None:
         return False
     await db.delete(session)
     await db.flush()

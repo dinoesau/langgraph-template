@@ -7,6 +7,8 @@ from typing import Any, TypeVar
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from models.base import Base
+from models.session import Session
+from models.user import User
 from services.auth_security import hash_password
 from services.auth_store import (
     auth_session_factory,
@@ -18,6 +20,7 @@ from services.auth_store import (
     get_session,
     get_user_by_email,
     list_sessions,
+    normalize_auth_url,
     rename_session,
 )
 
@@ -92,3 +95,30 @@ def test_session_crud_scoped_by_user() -> None:
             await engine.dispose()
 
     _run(_body())
+
+
+def test_normalize_auth_url_cases() -> None:
+    assert normalize_auth_url("postgres://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
+    assert normalize_auth_url("postgresql://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
+    assert normalize_auth_url("  sqlite:///:memory:  ") == "sqlite+aiosqlite:///:memory:"
+    assert normalize_auth_url("sqlite+aiosqlite:///:memory:") == "sqlite+aiosqlite:///:memory:"
+
+
+def test_models_match_initial_migration() -> None:
+    users = User.metadata.tables["users"]
+    sessions = User.metadata.tables["sessions"]
+    assert set(users.columns.keys()) == {
+        "id",
+        "email",
+        "username",
+        "hashed_password",
+        "created_at",
+    }
+    assert set(sessions.columns.keys()) == {
+        "id",
+        "user_id",
+        "name",
+        "username",
+        "created_at",
+    }
+    assert "ix_sessions_user_id" in {index.name for index in sessions.indexes}
