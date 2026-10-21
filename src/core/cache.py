@@ -11,7 +11,7 @@ import threading
 import time
 from typing import Any
 
-from agent.graph import RecallCachePort
+from core.memory import RecallCachePort
 
 logger = logging.getLogger("cache")
 
