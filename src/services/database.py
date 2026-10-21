@@ -72,6 +72,12 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     postgres_uri = normalize_postgres_uri(settings.postgres_uri)
     cache = build_cache(settings.valkey_host)
     app.state.recall_cache = cache
+    try:
+        from services.llm.service import LlmService
+
+        llm: Any | None = LlmService.from_settings(settings)
+    except ValueError:
+        llm = None
     async with AsyncExitStack() as stack:
         saver: Any = None
         store: BaseStore
@@ -96,6 +102,7 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             store=store,
             cache=cache,
             cache_ttl_seconds=settings.cache_ttl_seconds,
+            llm=llm,
         )
         try:
             yield

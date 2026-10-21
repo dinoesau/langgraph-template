@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     # Semantic memory plus cache. Empty host keeps the local fallback.
     cache_ttl_seconds: int = Field(default=60, ge=1, le=3600)
     valkey_host: str = ""
+    # Model fallback (S3). Empty key means that provider is skipped.
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    google_api_key: str = ""
+    default_llm_model: str = "default-openai"
+    default_llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    max_llm_call_retries: int = Field(default=3, ge=1, le=10)
+    llm_total_timeout_seconds: int = Field(default=60, ge=5, le=600)
 
 
 @lru_cache

@@ -63,7 +63,7 @@ async def _stream_loop(
         stream_mode="updates",
     ):
         for node_output in chunk.values():
-            for msg in node_output.get("messages", []):
+            for msg in (node_output or {}).get("messages", []):
                 if isinstance(msg, AIMessage) and isinstance(msg.content, str):
                     texts.append(msg.content)
                     yield f"data: {json.dumps({'text': msg.content})}\n\n"
