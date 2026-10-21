@@ -27,8 +27,8 @@ langgraph-template/
 │   ├── agent/
 │   │   ├── __init__.py
 │   │   ├── state.py         # GraphState, single source of truth
-│   │   ├── graph.py         # StateGraph wiring: chat -> tool_call -> chat
-│   │   ├── nodes.py         # chat node, routes with Command to tool_call or END
+│   │   ├── graph.py         # StateGraph wiring: recall -> chat -> tools -> chat
+│   │   ├── nodes.py         # recall once plus chat via fallback, routes via should_continue
 │   │   ├── tools/           # one @tool module per capability
 │   │   │   ├── __init__.py
 │   │   │   └── booking.py
@@ -132,12 +132,12 @@ Large data stays in tools or the store, never in checkpoints.
 
 ### `src/agent/graph.py`
 
-This file builds the two-node loop `chat -> tool_call -> chat`.
-The `chat` node returns a `Command` routing to `tool_call` or `END`.
+This file builds the loop `recall -> chat -> tools -> chat` with `ToolNode`.
+The `chat` node answers through the model fallback and routes via `should_continue` to `tools` or `END`.
 `AsyncPostgresSaver` persists full state per `thread_id` for resume and multi-turn memory.
 Export a `graph` variable for `langgraph.json`.
-The loop ships as an echo loop with no models, the `chat` to `tool_call` loop arrives with tool calling.
-Use a `make_the_agent(checkpointer)` factory when the server injects persistence.
+Without model keys the `chat` node echoes, so fresh clones stay green with no network.
+Use a `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` factory when the server injects persistence.
 Do not import FastAPI or DB code here.
 
 ### `src/agent/nodes.py`
@@ -156,9 +156,9 @@ Execute concurrent tool calls in parallel and feed results back to `chat`.
 
 ### `src/agent/routes.py`
 
-Each function takes state and returns the next node name.
+`should_continue` takes state and returns the next node name.
 Keep routing pure and deterministic.
-Use `with_structured_output` router model when LLM decides the route.
+It delegates to the prebuilt `tools_condition` so the seam stays canonical.
 Wire with `add_conditional_edges`.
 
 ### `src/api/v1/`

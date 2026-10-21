@@ -8,7 +8,7 @@ This guide describes the shipped behavior plus the target design.
 
 Short term state lives in the graph checkpointer.
 `GraphState` in `src/agent/state.py:1` uses `MessagesState` with `messages` plus a small `docs` list.
-Graphs use `make_the_agent(checkpointer, store, cache)` with `AsyncPostgresSaver` plus a LangGraph `BaseStore` per `docs/structure.md:140`.
+Graphs use `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` plus a LangGraph `BaseStore` per `docs/structure.md:140`.
 Nodes read recall through `get_store` with the per-user namespace `("memories", user_id)`, sync search on the sync path and async search on the async path.
 Recall is injected as `docs` on `invoke`, `ainvoke` and `astream` alike when a caller id is present.
 The lifespan builds the store with or without Postgres: `InMemoryStore` for fresh clones, pooled `AsyncPostgresStore` with `setup` when `POSTGRES_URI` is set.
@@ -83,7 +83,7 @@ The chat response stays correct even when memory fails.
 
 Values above are planned.
 See `.env.example:1` for the current env template.
-`POSTGRES_URI` in `.env.example:5` will back both checkpoints and vectors.
+`POSTGRES_URI` in `.env.example:9` will back both checkpoints and vectors.
 
 ## Startup pre-warming
 
@@ -93,7 +93,7 @@ This will avoid paying cold init cost on the first request.
 The call will live in the app lifespan when FastAPI exists.
 See `docs/structure.md:181` for the database lifespan role.
 Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
-Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
+Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`.
 
 ## Per-user isolation
 

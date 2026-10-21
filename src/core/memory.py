@@ -5,11 +5,20 @@ can never diverge. This module stays dependency-free on purpose.
 """
 
 import hashlib
-from typing import Any
+from typing import Any, Protocol
 
 MEMORY_NAMESPACE = "memories"
 DEFAULT_TOP_K = 4
 MAX_USER_ID_CHARS = 128
+
+
+class RecallCachePort(Protocol):
+    """Cache port owned by the loop; adapters satisfy it structurally."""
+
+    def get_sync(self, key: str) -> str | None: ...
+    def set_sync(self, key: str, value: str, ttl: int) -> None: ...
+    async def get(self, key: str) -> str | None: ...
+    async def set(self, key: str, value: str, ttl: int) -> None: ...
 
 
 def memory_namespace(user_id: str) -> tuple[str, str]:

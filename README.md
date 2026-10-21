@@ -4,7 +4,7 @@ This starter gives you a minimal production-minded base for LangGraph agents.
 It keeps the deploy contract small so you can grow the codebase step by step.
 It is uv-only for install, run, lint, and test.
 It adapts the layout ideas from the wassim249 template without copying its code.
-Most agent features are planned and the repo ships an echo loop with HTTP chat.
+Most agent features are planned and the repo ships a tool loop with model fallback plus HTTP chat.
 
 ## What's included
 
@@ -12,10 +12,10 @@ Most agent features are planned and the repo ships an echo loop with HTTP chat.
 - Dependencies in `pyproject.toml:1` use uv-only setup with a `src` layout.
 - Commands in `Makefile` wrap `uv sync`, dev server, tests, lint, and format.
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
-- Example specs in `docs/examples.md:1` describe five agents and none is implemented yet.
-- Echo loop with `graph` plus `state` answers greetings without models, tools arrive with the tool-calling loop.
-- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes is live, LLM fallback plus auth plus observability are planned.
-- Tests in `tests/unit_tests/` cover the loop plus settings plus HTTP plus memory isolation without model calls.
+- Example specs in `docs/examples.md:1` describe five agents and only the ReAct tool agent is implemented yet.
+- Tool loop with `graph` plus `state` plus `nodes` plus `routes` runs booking tools, echo stays only when no model keys are set.
+- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback is live, auth plus observability are planned.
+- Tests in `tests/unit_tests/` cover the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
 ## Quickstart
@@ -33,7 +33,7 @@ uv run pytest
 ```
 
 The dev server entry comes from `langgraph.json:1`.
-The graph module exists as an echo loop and the dev server loads it.
+The graph module runs the `recall` to `chat` to `tools` loop and the dev server loads it.
 The HTTP skeleton serves on `:8000` with `GET /api/v1/health` and `POST /api/v1/chat`.
 Use `Makefile` when you prefer short targets for the same uv commands.
 Read `docs/structure.md:1` before adding new files so the layout stays small.
@@ -49,7 +49,7 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 | [Configuration](docs/configuration.md) | Environment variables and defaults |
 | [Authentication](docs/authentication.md) | Planned JWT flow and sessions |
 | [Database](docs/database.md) | Planned schema, migrations, and pgvector |
-| [LLM Service](docs/llm-service.md) | Planned models, retries, and fallback |
+| [LLM Service](docs/llm-service.md) | Model registry, retries, and circular fallback |
 | [Memory](docs/memory.md) | Planned long-term memory and cache |
 | [Observability](docs/observability.md) | Planned tracing, logging, and metrics |
 | [Evaluation](docs/evaluation.md) | Planned trajectory scoring and eval runs |
@@ -63,8 +63,8 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 
 ```text
 langgraph-template/
-├── src/agent/        # planned graph, state, nodes, tools, routes
-├── tests/            # unit placeholders plus integration placeholders
+├── src/agent/        # graph, state, nodes, tools, routes
+├── tests/            # unit suites with fakes plus integration placeholders
 ├── docs/             # 13 guides: structure, examples, testing, services
 ├── langgraph.json    # deploy contract
 ├── pyproject.toml    # uv-only dependencies
@@ -80,7 +80,7 @@ Grow into `src/api/` and `src/services/` only when shipping to users.
 
 **Is this ready to deploy today?**
 No.
-The deploy contract maps to an echo loop, production agent features are still planned.
+The deploy contract maps to the tool loop, auth plus observability plus evals are still planned.
 
 **How do I add the first agent?**
 Follow `docs/structure.md:1` for file roles.

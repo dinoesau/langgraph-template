@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 800" font-family="Helvetica, Arial, sans-serif">
 <rect x="4" y="4" width="1232" height="792" rx="18" fill="#f4f4f4" stroke="#333" stroke-width="3"/>
 <text x="620" y="42" text-anchor="middle" font-size="24" font-weight="bold" fill="#8a5a00">Clean Architecture — target build reference v7</text>
-<text x="620" y="64" text-anchor="middle" font-size="12" font-style="italic" fill="#555">verified 2026-10-18: #1 confirmed tradeoff, #2 target-only + wiki 3.3 vs 6.1 conflict</text>
+<text x="620" y="64" text-anchor="middle" font-size="12" font-style="italic" fill="#555">verified 2026-10-21: #1 confirmed tradeoff, #2 target-only + wiki 3.3 vs 6.1 conflict</text>
 
 <!-- rings -->
 <circle cx="300" cy="390" r="250" fill="#a9cfe8" stroke="#333" stroke-width="2.5"/>
@@ -44,8 +44,8 @@
 <text x="600" y="138" fill="#333">○ Trajectory + EvalReport (scored JSON on demand)</text>
 
 <text x="600" y="166" font-size="17" font-weight="bold" fill="#333">Use Cases — loop owns state, tools, pure routing</text>
-<text x="600" y="186" fill="#333">● echo (transitional) → ○ chat + tool_call loop</text>
-<text x="600" y="204" fill="#333">○ booking tools · ○ retrieval + generator</text>
+<text x="600" y="186" fill="#333">● recall + chat + tools loop (echo fallback without keys)</text>
+<text x="600" y="204" fill="#333">● booking tools · ○ retrieval + generator</text>
 <text x="600" y="222" fill="#333">○ router triage · ○ workers fan-out · ○ grader</text>
 
 <text x="600" y="250" font-size="17" font-weight="bold" fill="#333">Adapters — HTTP translates, services adapt</text>

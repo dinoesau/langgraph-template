@@ -83,7 +83,7 @@ Keep secrets out of image layers at all times.
 
 Local dev uses one `.env` file today.
 See `.env.example:1` for the template.
-`POSTGRES_URI` in `.env.example:5` points at localhost today.
+`POSTGRES_URI` in `.env.example:9` points at localhost today.
 Docker networking will need `db` as host instead of localhost.
 Each deploy stage will get its own env file when stack lands.
 Copy the example file per stage and edit values there.

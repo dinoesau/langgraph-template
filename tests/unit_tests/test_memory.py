@@ -191,7 +191,7 @@ def test_recall_parity_across_invoke_ainvoke_astream(clean_env: None) -> None:
     assert "green tea" in sync_result["docs"][0]
     assert "green tea" in async_result["docs"][0]
     assert sync_result["messages"][-1].content == async_result["messages"][-1].content
-    assert any("docs" in chunk.get("echo", {}) for chunk in chunks)
+    assert any("docs" in (chunk.get("recall") or {}) for chunk in chunks)
 
 
 def test_repeated_recall_hits_cache(clean_env: None) -> None:

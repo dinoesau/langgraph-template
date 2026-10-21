@@ -2,14 +2,14 @@
 
 This file specs the five example agents to build in this repo.
 Each one demonstrates a core LangGraph workflow pattern.
-None is implemented yet; build in order, router last.
+Example 1 (ReAct tool agent) is live; examples 2-5 are specs, build in order, router last.
 All examples live under `src/agent/:1`.
 Extra specialists join as subgraph nodes sharing `GraphState` in `src/agent/state.py:1`.
 
 ## 1. ReAct tool agent
 
-Answers "book me tomorrow 10am" by looping `chat -> tool_call -> chat`.
-Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
+Answers "book me tomorrow 10am" by looping `chat -> tools -> chat`.
+Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`.
 The `chat` node binds the `tools` list with `bind_tools`.
 The service rebinds them on fallback inside `src/services/llm/service.py:1`.
 The loop ends when the LLM reply has no `tool_calls`.
@@ -47,6 +47,6 @@ Done when a rude first draft converges to an approved reply within the guard.
 
 ## Shared wiring
 
-All graphs use `make_the_agent(checkpointer)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
+All graphs use `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
 Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
 Long term memory lives in `src/services/memory.py:1` with cache in `src/core/cache.py:1`.

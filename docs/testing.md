@@ -12,6 +12,7 @@ Database calls, LLM calls, and external APIs are mocked or stubbed with fakes.
 Fake chat models and stub tools cover nodes, routing, and reducers deterministically.
 This keeps unit tests blindingly fast because nothing waits on network or disk.
 Run them with `make test` or a single file with `make test TEST_FILE=tests/unit_tests/test_graph.py`.
+AC-09 plus AC-10 ride here as artifacts: `test_time_request_converges_to_confirmation` proves the time-slot loop ends in confirmation, and the fallback plus budget tests in `tests/unit_tests/test_llm_service.py:1` prove retries with circular fallback under the total budget.
 
 ## 2. Integration tests: ephemeral Docker database
 
