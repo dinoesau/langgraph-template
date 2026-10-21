@@ -11,7 +11,7 @@ Los modelos ORM viven en `src/models/:1`.
 El acceso a datos vive en `src/services/database.py:1`.
 Las migraciones viven en `alembic/:1`.
 La conexion local esta en `docker-compose.yml:1`.
-La URL de conexion esta en `.env.example:5`.
+La URL de conexion esta en `.env.example:9`.
 El layout completo esta en `docs/structure.md:22`.
 
 ## Schema
@@ -54,7 +54,7 @@ El checkpointer mas el store se proveen como dependencia de lifespan desde `src/
 Sin `POSTGRES_URI` el loop sigue efimero; con la variable puesta el arranque falla si el store no responde.
 Nunca guardes datos grandes en `GraphState` porque quedan en los checkpoints.
 `GraphState` en `src/agent/state.py:1` usa `MessagesState` con `messages` mas lista pequena `docs`.
-Las tools `get_availability`, `book_appointment` y `get_order_status` viven en `src/agent/tools/booking.py:1`.
+Las tools `get_availability` y `book_appointment` viven en `src/agent/tools/booking.py:1`.
 
 ## Migraciones con Alembic
 
@@ -65,7 +65,7 @@ Genera una migracion con `uv run alembic revision --autogenerate -m "describe el
 Revisa el archivo generado en `alembic/versions/:1` antes de aplicarlo.
 Retrocede una migracion con `uv run alembic downgrade -1`.
 Muestra el historial con `uv run alembic history`.
-Alembic lee la URL desde `.env.example:5` via `src/core/config.py:1`.
+Alembic lee la URL desde `.env.example:9` via `src/core/config.py:1`.
 Los atajos `db-upgrade`, `db-revision`, `db-downgrade` y `db-history` viven en el `Makefile`.
 
 ### Como funciona autogenerate

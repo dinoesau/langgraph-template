@@ -60,7 +60,7 @@ Cada modelo reintenta con backoff exponencial entre 2 y 10 segundos mas jitter.
 El maximo de intentos por modelo es `MAX_LLM_CALL_RETRIES` con valor 3.
 Reintentan rate limit, timeout y errores de API; lo desconocido tambien reintenta para degradar hacia el fallback en vez de fallar en duro.
 Falla rapido sin reintento ante auth, API key, permisos, validacion y 400/401/403/404.
-Los modelos crudos llevan `max_retries=1`: el loop del servicio es dueno de los reintentos, sin doble retry del provider.
+Los modelos crudos llevan `max_retries=0`: el loop del servicio es dueno de los reintentos, sin doble retry del provider.
 Un presupuesto total de `LLM_TOTAL_TIMEOUT_SECONDS` con valor 60 segundos limita todo el ciclo y corta esperas que lo excedan.
 Sin ese presupuesto el peor caso sumaria reintentos por modelos por esperas y superaria los 2 minutos.
 El fallback recorre la lista en orden circular desde `DEFAULT_LLM_MODEL` y se detiene tras un ciclo completo.

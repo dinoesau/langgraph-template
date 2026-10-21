@@ -2,7 +2,7 @@
 
 This guide takes a fresh checkout to the first graph answer.
 Every step uses uv only.
-The echo loop plus HTTP skeleton are live and the setup below already works.
+The tool loop plus HTTP skeleton are live and the setup below already works.
 
 ## Prerequisites
 
@@ -58,8 +58,8 @@ This matches the `dev` target in `Makefile:11`.
 
 ## First call
 
-The graph module `src/agent/graph.py:1` ships an echo loop with no models.
-It answers greetings with no provider keys and the tool loop arrives later.
+The graph module `src/agent/graph.py:1` runs the tool loop with model fallback.
+It answers greetings with no provider keys through the echo fallback.
 Once the module exports `graph`, the dev server exposes Studio on the printed URL.
 Open that Studio URL in the browser.
 Select the `agent` graph declared in `langgraph.json:1`.

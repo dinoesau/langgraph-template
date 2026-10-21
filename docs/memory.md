@@ -83,7 +83,7 @@ The chat response stays correct even when memory fails.
 
 Values above are planned.
 See `.env.example:1` for the current env template.
-`POSTGRES_URI` in `.env.example:5` will back both checkpoints and vectors.
+`POSTGRES_URI` in `.env.example:9` will back both checkpoints and vectors.
 
 ## Startup pre-warming
 
@@ -93,7 +93,7 @@ This will avoid paying cold init cost on the first request.
 The call will live in the app lifespan when FastAPI exists.
 See `docs/structure.md:181` for the database lifespan role.
 Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
-Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`, `get_order_status`.
+Tools live in `src/agent/tools/booking.py:1` as `get_availability`, `book_appointment`.
 
 ## Per-user isolation
 
