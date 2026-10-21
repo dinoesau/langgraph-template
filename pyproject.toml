@@ -17,6 +17,10 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.2.0",
     "redis>=5.0",
     "langgraph-store-postgres>=0.1.0",
+    "langchain>=1.0",
+    "langchain-openai>=1.0",
+    "langchain-anthropic>=1.0",
+    "langchain-google-genai>=3.0",
 ]
 
 [dependency-groups]
