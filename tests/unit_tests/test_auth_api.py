@@ -153,6 +153,8 @@ def test_challenge_only_on_401(client: TestClient) -> None:
     )
     assert forbidden.status_code == 403
     assert "www-authenticate" not in forbidden.headers
+
+
 def test_expired_token_is_401(client: TestClient) -> None:
     secret = "test-secret-0123456789abcdef01234567"
     expired = create_token("1", "user", None, -1, secret=secret, algorithm="HS256")

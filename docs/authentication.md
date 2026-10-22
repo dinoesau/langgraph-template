@@ -27,7 +27,7 @@ sequenceDiagram
     A-->>C: {access_token, token_type, expires_at}
 
     C->>A: POST /api/v1/auth/session<br/>Bearer: user token
-    A-->>C: {session_id, token}
+    A-->>C: {session_id, token, token_type}
 
     C->>A: POST /api/v1/chat<br/>Bearer: session token
     A-->>C: {reply, thread_id}
@@ -45,6 +45,7 @@ Ambos seran JWT firmados con HS256 y expiracion configurable.
 Crea una cuenta nueva con email, password y username opcional.
 Devuelve `access_token` y `expires_at` (201).
 El password requiere 8 a 128 caracteres con mayuscula, minuscula, numero y simbolo.
+El email admite hasta 254 caracteres.
 El username se guarda en la sesion para personalizar las respuestas.
 
 ```json
