@@ -4,7 +4,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Security
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
@@ -70,7 +70,11 @@ async def _stream_loop(
 
 def _session_thread(ctx: SessionContext) -> str:
     """Return the server-authoritative thread for one session context."""
-    assert ctx.session_id is not None
+    if ctx.session_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session token is missing its session",
+        )
     return ctx.session_id
 
 

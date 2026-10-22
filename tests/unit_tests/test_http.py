@@ -199,3 +199,15 @@ def test_full_journey_register_login_session_chat_history(
     assert [row["id"] for row in listed.json()] == [session_id]
     state = app.state.agent_graph.get_state({"configurable": {"thread_id": session_id}})
     assert [m.content for m in state.values["messages"]] == ["one", "Echo: one", "two", "Echo: two"]
+
+
+def test_deleted_session_keeps_thread_state(
+    client: tuple[TestClient, FastAPI],
+) -> None:
+    http, app = client
+    headers, session_id = _auth_headers(http)
+    assert http.post("/api/v1/chat", json={"message": "one"}, headers=headers).status_code == 200
+    assert http.delete(f"/api/v1/auth/session/{session_id}", headers=headers).status_code == 204
+    state = app.state.agent_graph.get_state({"configurable": {"thread_id": session_id}})
+    assert [m.content for m in state.values["messages"]] == ["one", "Echo: one"]
+    assert http.post("/api/v1/chat", json={"message": "two"}, headers=headers).status_code == 404

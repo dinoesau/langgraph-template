@@ -40,7 +40,7 @@ erDiagram
 User representa una cuenta con email unico.
 Session representa una conversacion y un usuario puede tener muchas.
 Session copia el username al crearse para evitar una lectura extra en cada chat.
-Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session cuando aterricen los tokens de sesion.
+Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapea a Session via `thread_id == session.id` bajo token de sesion.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
 Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
 Las tablas del store `store`, `store_vectors` y `store_migrations` las gestiona LangGraph y tampoco Alembic.

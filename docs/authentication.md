@@ -21,16 +21,16 @@ sequenceDiagram
     participant A as API
 
     C->>A: POST /api/v1/auth/register<br/>{email, password, username?}
-    A-->>C: {user_id, email, username, access_token, expires_at}
+    A-->>C: {access_token, token_type, expires_at}
 
-    C->>A: POST /api/v1/auth/login<br/>form: email + password
-    A-->>C: {access_token, expires_at}
+    C->>A: POST /api/v1/auth/login<br/>form: username + password
+    A-->>C: {access_token, token_type, expires_at}
 
     C->>A: POST /api/v1/auth/session<br/>Bearer: user token
     A-->>C: {session_id, token}
 
     C->>A: POST /api/v1/chat<br/>Bearer: session token
-    A-->>C: {messages}
+    A-->>C: {reply, thread_id}
 ```
 
 La API usara dos alcances de token.
