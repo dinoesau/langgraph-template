@@ -4,6 +4,7 @@ Handlers map DTOs to schemas, so ORM never crosses the HTTP seam.
 Engine uses psycopg async for Postgres and aiosqlite for tests.
 """
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -19,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from models.session import Session
 from models.user import User
-from services.auth_security import averify_password
+from services.auth_security import averify_password, dummy_hash_value
 
 
 @dataclass(frozen=True)
@@ -114,11 +115,10 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> UserDTO | None:
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> UserDTO | None:
     """Check credentials with timing mitigation, None on any failure."""
-    from services.auth_security import DUMMY_HASH
-
     user = await _fetch_user_row(db, email)
     if user is None:
-        await averify_password(password, DUMMY_HASH)
+        dummy = await asyncio.to_thread(dummy_hash_value)
+        await averify_password(password, dummy)
         return None
     if not await averify_password(password, user.hashed_password):
         return None

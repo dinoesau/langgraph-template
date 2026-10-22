@@ -122,3 +122,29 @@ def test_models_match_initial_migration() -> None:
         "created_at",
     }
     assert "ix_sessions_user_id" in {index.name for index in sessions.indexes}
+
+
+def test_list_sessions_orders_by_creation() -> None:
+    from datetime import datetime
+
+    from sqlalchemy import update as sa_update
+
+    async def _body() -> None:
+        engine, db = await _fresh_db()
+        try:
+            user = await create_user(db, "o@b.co", None, hash_password("ChangeMe123!"))
+            first = await create_session(db, user.id, None)
+            second = await create_session(db, user.id, None)
+            await db.execute(
+                sa_update(Session)
+                .where(Session.id == second.id)
+                .values(created_at=datetime(2000, 1, 1))
+            )
+            rows = await list_sessions(db, user.id)
+            # Backdated row is older, so creation order puts it first.
+            assert [row.id for row in rows] == [second.id, first.id]
+        finally:
+            await db.close()
+            await engine.dispose()
+
+    _run(_body())
