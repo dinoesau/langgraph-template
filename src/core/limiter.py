@@ -20,7 +20,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 def reset_limiter() -> None:
     """Clear in-memory counters; tests call this for isolation."""
+    storage = getattr(limiter, "_storage", None)
+    reset = getattr(storage, "reset", None)
+    if not callable(reset):
+        logger.debug("limiter reset skipped: no resettable storage")
+        return
     try:
-        limiter._storage.reset()
+        reset()
     except Exception:  # noqa: BLE001 - reset is best effort across backends
         logger.debug("limiter reset skipped")
