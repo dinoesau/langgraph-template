@@ -1,6 +1,5 @@
 """Auth endpoints: register plus login plus session lifecycle."""
 
-from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
@@ -11,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.deps import SessionContext, get_db, require_scope
 from core.config import Settings, get_settings
 from schemas.auth import RegisterIn, RenameIn, SessionInfo, SessionOut, TokenOut
-from services.auth_security import create_token, hash_password
+from services.auth_security import ahash_password, create_token, decode_token
 from services.auth_store import (
     SessionDTO,
     authenticate_user,
@@ -27,9 +26,11 @@ from services.auth_store import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _expiry_ts(minutes: int) -> int:
-    """Return the unix expiry for a token lifetime in minutes."""
-    return int((datetime.now(UTC) + timedelta(minutes=minutes)).timestamp())
+def _token_exp(token: str, settings: Settings) -> int:
+    """Read exp from the minted token so wire expiry matches token expiry."""
+    return decode_token(
+        token, secret=settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+    ).exp
 
 
 def _mint_user_token(user_id: str, settings: Settings) -> TokenOut:
@@ -42,7 +43,7 @@ def _mint_user_token(user_id: str, settings: Settings) -> TokenOut:
         secret=settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )
-    return TokenOut(access_token=token, expires_at=_expiry_ts(settings.jwt_user_expire_minutes))
+    return TokenOut(access_token=token, expires_at=_token_exp(token, settings))
 
 
 def _mint_session_token(user_id: str, session_id: str, settings: Settings) -> SessionOut:
@@ -83,7 +84,7 @@ async def register(
             db,
             str(body.email),
             body.username,
-            hash_password(body.password.get_secret_value()),
+            await ahash_password(body.password.get_secret_value()),
         )
         await db.commit()
     except IntegrityError:
@@ -117,7 +118,12 @@ async def create_chat_session(
     """Create one session row and return its session-scoped token."""
     settings = get_settings()
     user = await get_user_by_id(db, int(ctx.user_id))
-    assert user is not None
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     created = await create_session(db, int(ctx.user_id), user.username)
     await db.commit()
     return _mint_session_token(ctx.user_id, created.id, settings)

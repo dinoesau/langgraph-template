@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
+from sqlalchemy import text
 
 from agent.graph import AgentGraph, graph, make_the_agent
 from core.cache import RecallCache, build_cache
@@ -90,8 +91,8 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if "sqlite" in str(auth_engine.url):
         async with auth_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-    async with auth_engine.connect():
-        pass
+    async with auth_engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
     app.state.auth_engine = auth_engine
     app.state.auth_session_factory = auth_session_factory(auth_engine)
     async with AsyncExitStack() as stack:

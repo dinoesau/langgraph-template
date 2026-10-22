@@ -134,6 +134,7 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found",
+                headers=_auth_challenge(security_scopes.scope_str),
             )
         if session.user_id != user_id:
             raise HTTPException(
