@@ -19,7 +19,7 @@ from sqlalchemy.pool import StaticPool
 
 from models.session import Session
 from models.user import User
-from services.auth_security import verify_password
+from services.auth_security import averify_password
 
 
 @dataclass(frozen=True)
@@ -118,9 +118,9 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 
     user = await _fetch_user_row(db, email)
     if user is None:
-        verify_password(password, DUMMY_HASH)
+        await averify_password(password, DUMMY_HASH)
         return None
-    if not verify_password(password, user.hashed_password):
+    if not await averify_password(password, user.hashed_password):
         return None
     return _to_user_dto(user)
 
