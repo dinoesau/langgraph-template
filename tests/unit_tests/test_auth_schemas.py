@@ -37,3 +37,8 @@ def test_register_blank_username_becomes_none() -> None:
 def test_rename_rejects_blank() -> None:
     with pytest.raises(ValidationError):
         RenameIn(name="   ")
+
+
+def test_register_rejects_overlong_email() -> None:
+    with pytest.raises(ValidationError):
+        RegisterIn(email="a" * 250 + "@b.co", password=SecretStr("ChangeMe123!"), username=None)

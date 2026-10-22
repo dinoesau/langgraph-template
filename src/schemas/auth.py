@@ -2,8 +2,9 @@
 
 import re
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, SecretStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, SecretStr, field_validator
 
 _PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$")
 _MAX_USERNAME_CHARS = 32
@@ -17,7 +18,7 @@ def _clean_name(raw: str) -> str:
 class RegisterIn(BaseModel):
     """Inbound registration, parsed once at the HTTP edge."""
 
-    email: EmailStr
+    email: Annotated[EmailStr, Field(max_length=254)]
     password: SecretStr
     username: str | None = None
 

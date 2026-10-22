@@ -1,12 +1,15 @@
 """Unit tests for auth crypto: hashing plus JWT claims."""
 
 import time
+from typing import Literal
 
 import pytest
 from jwt.exceptions import InvalidTokenError
 
 from services.auth_security import (
     DUMMY_HASH,
+    ahash_password,
+    averify_password,
     create_token,
     decode_token,
     hash_password,
@@ -14,7 +17,7 @@ from services.auth_security import (
 )
 
 _SECRET = "test-secret-0123456789abcdef0123456789"
-_ALGO = "HS256"
+_ALGO: Literal["HS256"] = "HS256"
 
 
 def test_hash_and_verify_roundtrip() -> None:
@@ -69,3 +72,17 @@ def test_wrong_secret_rejected() -> None:
 
 def test_malformed_hash_verifies_false() -> None:
     assert not verify_password("anything", "not-a-valid-hash")
+
+
+def test_non_hs256_rejected() -> None:
+    token = create_token("1", "user", None, 30, secret=_SECRET, algorithm="HS256")
+    with pytest.raises(InvalidTokenError):
+        decode_token(token, secret=_SECRET, algorithms=["HS512"])  # type: ignore[list-item]
+
+
+def test_async_wrappers_roundtrip() -> None:
+    import asyncio
+
+    hashed = asyncio.run(ahash_password("ChangeMe123!"))
+    assert asyncio.run(averify_password("ChangeMe123!", hashed))
+    assert not asyncio.run(averify_password("Wrong123!x", hashed))

@@ -4,8 +4,10 @@ Single token creator keeps expiry plus least scope plus uniqueness in one
 place. Scope is space-delimited per OAuth2, sid binds session tokens.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 import jwt
 from jwt.exceptions import InvalidTokenError
@@ -55,6 +57,16 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+async def ahash_password(password: str) -> str:
+    """Hash off the event loop so argon2 never blocks serving."""
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def averify_password(plain: str, hashed: str) -> bool:
+    """Verify off the event loop, failing closed on corrupt hashes."""
+    return await asyncio.to_thread(verify_password, plain, hashed)
+
+
 def create_token(
     sub: str,
     scope: str,
@@ -62,7 +74,7 @@ def create_token(
     expires_minutes: int,
     *,
     secret: str,
-    algorithm: str = "HS256",
+    algorithm: Literal["HS256"] = "HS256",
 ) -> str:
     """Mint one JWT with sub plus scope plus sid plus jti plus expiry."""
     if not secret.strip():
@@ -79,7 +91,9 @@ def create_token(
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 
-def decode_token(token: str, *, secret: str, algorithms: list[str] | None = None) -> TokenData:
+def decode_token(
+    token: str, *, secret: str, algorithms: list[Literal["HS256"]] | None = None
+) -> TokenData:
     """Verify one JWT and return its typed claims or raise InvalidTokenError."""
     decoded = jwt.decode(token, secret, algorithms=algorithms or ["HS256"])
     scope_raw = decoded.get("scope", "")
@@ -96,6 +110,8 @@ def decode_token(token: str, *, secret: str, algorithms: list[str] | None = None
 __all__ = [
     "InvalidTokenError",
     "TokenData",
+    "ahash_password",
+    "averify_password",
     "create_token",
     "decode_token",
     "hash_password",
