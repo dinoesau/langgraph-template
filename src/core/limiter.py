@@ -12,6 +12,9 @@ from slowapi.util import get_remote_address
 
 logger = logging.getLogger("limiter")
 
+#: Retry hint for per-minute auth windows; single source for the 429 handler.
+RETRY_AFTER_SECONDS = 60
+
 limiter = Limiter(key_func=get_remote_address)
 
 

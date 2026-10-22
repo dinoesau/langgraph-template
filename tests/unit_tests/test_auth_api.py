@@ -236,3 +236,4 @@ def test_login_rate_limited(client: TestClient) -> None:
         data={"username": "l@b.co", "password": "ChangeMe123!", "grant_type": "password"},
     )
     assert limited.status_code == 429
+    assert limited.headers.get("retry-after") == "60"

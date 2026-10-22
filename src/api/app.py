@@ -7,7 +7,7 @@ from starlette.types import Lifespan
 
 from api.v1 import auth, chat, health
 from core.config import get_settings
-from core.limiter import limiter
+from core.limiter import RETRY_AFTER_SECONDS, limiter
 from core.middleware import RequestIDMiddleware, setup_logging
 from services.database import agent_lifespan
 
@@ -17,7 +17,7 @@ def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRespons
     return JSONResponse(
         status_code=429,
         content={"detail": "Too many requests"},
-        headers={"Retry-After": "60"},
+        headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
     )
 
 
