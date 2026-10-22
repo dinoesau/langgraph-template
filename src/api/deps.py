@@ -76,7 +76,7 @@ def get_memory_writer(request: Request) -> WriterHook:
 
 
 def _auth_challenge(scope: str = "") -> dict[str, str]:
-    """Build the WWW-Authenticate header for 401 plus 403 responses."""
+    """Build the WWW-Authenticate header for 401 responses (RFC 9110 s11.4)."""
     value = 'Bearer realm="auth"'
     if scope:
         value += f' scope="{scope}"'
@@ -113,7 +113,6 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions",
-                headers=_auth_challenge(security_scopes.scope_str),
             )
         try:
             user_id = int(data.sub)
@@ -127,20 +126,17 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Session token is missing its session",
-                headers=_auth_challenge(security_scopes.scope_str),
             )
         session = await get_session(db, data.sid)
         if session is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found",
-                headers=_auth_challenge(security_scopes.scope_str),
             )
         if session.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Session scope mismatch",
-                headers=_auth_challenge(security_scopes.scope_str),
             )
         return SessionContext(user_id=data.sub, session_id=session.id)
 

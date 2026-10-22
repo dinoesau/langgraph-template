@@ -137,3 +137,18 @@ def test_rename_and_delete_roundtrip(client: TestClient) -> None:
     assert deleted.status_code == 204
     listed = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {user_token}"})
     assert listed.json() == []
+
+
+def test_challenge_only_on_401(client: TestClient) -> None:
+    user_token = _register(client)
+    bad = user_token[:-2] + ("ab" if not user_token.endswith("ab") else "cd")
+    denied = client.get("/api/v1/auth/sessions", headers={"Authorization": f"Bearer {bad}"})
+    assert denied.status_code == 401
+    assert denied.headers.get("www-authenticate") == 'Bearer realm="auth" scope="user"'
+    forbidden = client.patch(
+        "/api/v1/auth/session/any-id/name",
+        json={"name": "x"},
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert forbidden.status_code == 403
+    assert "www-authenticate" not in forbidden.headers

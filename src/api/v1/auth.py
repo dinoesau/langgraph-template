@@ -105,7 +105,8 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            # Same shape as the deps challenge so clients parse one format.
+            headers={"WWW-Authenticate": 'Bearer realm="auth"'},
         )
     return _mint_user_token(str(user.id), settings)
 
