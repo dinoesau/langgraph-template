@@ -10,6 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Proven configuration values, parsed once at the edge."""
 
+    # extra="ignore" is deliberate: the env carries non-model keys
+    # (e.g. LANGSMITH_API_KEY passthrough) that must not fail boot.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: Literal["development", "staging", "production"] = "development"

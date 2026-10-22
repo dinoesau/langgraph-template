@@ -19,7 +19,7 @@ password_hash = PasswordHash.recommended()
 _dummy_hash: str | None = None
 
 
-def _dummy_hash_value() -> str:
+def dummy_hash_value() -> str:
     """Return the timing-mitigation hash, computing it once on first use."""
     global _dummy_hash
     if _dummy_hash is None:
@@ -30,7 +30,7 @@ def _dummy_hash_value() -> str:
 def __getattr__(name: str) -> str:
     """Serve DUMMY_HASH lazily so imports skip one argon2 hash."""
     if name == "DUMMY_HASH":
-        return _dummy_hash_value()
+        return dummy_hash_value()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -114,6 +114,7 @@ __all__ = [
     "averify_password",
     "create_token",
     "decode_token",
+    "dummy_hash_value",
     "hash_password",
     "password_hash",
     "verify_password",
