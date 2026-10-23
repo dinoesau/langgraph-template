@@ -14,15 +14,15 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
-from starlette.requests import Request
 
 from agent.graph import graph, make_the_agent
 from api.app import create_app
-from api.deps import get_request_user_id
 from core.cache import InMemoryTTLCache, RecallCache, build_cache
 from core.config import get_settings
+from core.limiter import reset_limiter
 from core.memory import build_memory_key, format_recall, memory_namespace
 from services import database
+from services.auth_security import decode_token
 from services.memory import extract_memories, persist_turn, snapshot_messages
 
 
@@ -32,7 +32,9 @@ def clean_env_fixture(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, 
     monkeypatch.setenv("POSTGRES_URI", "")
     monkeypatch.setenv("VALKEY_HOST", "")
     monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-0123456789abcdef01234567")
     get_settings.cache_clear()
+    reset_limiter()
     yield
     get_settings.cache_clear()
 
@@ -251,24 +253,51 @@ def test_http_recall_stays_per_user(clean_env: None) -> None:
     app = create_app()
     with TestClient(app) as client:
         assert app.state.agent_store is not None
+        alice_reg = client.post(
+            "/api/v1/auth/register",
+            json={"email": "alice@b.co", "password": "ChangeMe123!", "username": "alice"},
+        )
+        bob_reg = client.post(
+            "/api/v1/auth/register",
+            json={"email": "bob@b.co", "password": "ChangeMe123!", "username": "bob"},
+        )
+        assert alice_reg.status_code == 201
+        assert bob_reg.status_code == 201
+        alice_user_token = str(alice_reg.json()["access_token"])
+        bob_user_token = str(bob_reg.json()["access_token"])
+        alice_sid = str(
+            client.post(
+                "/api/v1/auth/session",
+                headers={"Authorization": f"Bearer {alice_user_token}"},
+            ).json()["token"]
+        )
+        bob_sid = str(
+            client.post(
+                "/api/v1/auth/session",
+                headers={"Authorization": f"Bearer {bob_user_token}"},
+            ).json()["token"]
+        )
         first = client.post(
             "/api/v1/chat",
-            json={"message": "alice customtea", "thread_id": "http-alice"},
-            headers={"X-User-ID": "alice"},
+            json={"message": "alice customtea"},
+            headers={"Authorization": f"Bearer {alice_sid}"},
         )
         second = client.post(
             "/api/v1/chat",
-            json={"message": "bob customtea", "thread_id": "http-bob"},
-            headers={"X-User-ID": "bob"},
+            json={"message": "bob customtea"},
+            headers={"Authorization": f"Bearer {bob_sid}"},
         )
     assert first.status_code == 200
     assert second.status_code == 200
+    secret = "test-secret-0123456789abcdef01234567"
+    alice_uid = decode_token(alice_user_token, secret=secret).sub
+    bob_uid = decode_token(bob_user_token, secret=secret).sub
 
     async def _stored() -> tuple[list[Any], list[Any]]:
         store: BaseStore = app.state.agent_store
         return (
-            await store.asearch(memory_namespace("alice"), query="customtea", limit=5),
-            await store.asearch(memory_namespace("bob"), query="customtea", limit=5),
+            await store.asearch(memory_namespace(alice_uid), query="customtea", limit=5),
+            await store.asearch(memory_namespace(bob_uid), query="customtea", limit=5),
         )
 
     alice_rows, bob_rows = asyncio.run(_stored())
@@ -277,7 +306,7 @@ def test_http_recall_stays_per_user(clean_env: None) -> None:
     assert any("bob customtea" in str(row.value) for row in bob_rows)
 
 
-def test_production_ignores_transitional_header(
+def test_chat_requires_token_in_production(
     clean_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("APP_ENV", "production")
@@ -286,18 +315,10 @@ def test_production_ignores_transitional_header(
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/chat",
-            json={"message": "green tea", "thread_id": "prod-t1"},
+            json={"message": "green tea"},
             headers={"X-User-ID": "alice"},
         )
-    assert response.status_code == 200
-
-    async def _stored() -> list[Any]:
-        rows = await app.state.agent_store.asearch(
-            memory_namespace("alice"), query="green tea", limit=5
-        )
-        return list(rows)
-
-    assert asyncio.run(_stored()) == []
+    assert response.status_code == 401
 
 
 def test_set_warms_fallback_when_primary_succeeds(clean_env: None) -> None:
@@ -382,24 +403,6 @@ def test_cache_close_is_safe_without_server(clean_env: None) -> None:
         cache.close_sync()
 
     asyncio.run(_run())
-
-
-def test_overlong_user_id_degrades_closed(clean_env: None) -> None:
-    def _request(uid: str) -> Request:
-        return Request(
-            {
-                "type": "http",
-                "method": "GET",
-                "path": "/api/v1/chat",
-                "headers": [(b"x-user-id", uid.encode())],
-            }
-        )
-
-    long_a = "a" * 128 + "1"
-    long_b = "a" * 128 + "2"
-    assert get_request_user_id(_request(long_a)) == ""
-    assert get_request_user_id(_request(long_b)) == ""
-    assert get_request_user_id(_request("alice")) == "alice"
 
 
 def test_lifespan_closes_cache_on_shutdown(

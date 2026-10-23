@@ -1,7 +1,7 @@
 # Architecture
 
 This doc shows how the starter fits together today and where it grows next.
-A tool loop with model fallback plus HTTP chat are live, auth plus observability stay planned.
+A tool loop with model fallback plus HTTP chat plus auth are live, observability stays planned.
 The layout follows the spec in `docs/structure.md:1`.
 
 ## System overview
@@ -37,7 +37,7 @@ Postgres is optional; without it the loop stays ephemeral, with it threads persi
 | Routes | `src/agent/routes.py:14` | Existe | `should_continue` delega en `tools_condition`, puro de `tool_calls` al siguiente nodo |
 | Prompts | `src/agent/prompts/:1` | Planeado | Stores system templates loaded once at startup |
 | Context schema | `src/agent/configuration.py:1` | Planeado | Declares model name, limits, and store name |
-| HTTP API | `src/api/v1/:1` | Existe | Skeleton translates HTTP into graph invoke or stream calls with transitional `X-User-ID`, auth arrives with the auth lifecycle |
+| HTTP API | `src/api/v1/:1` | Existe | Translates HTTP into graph invoke or stream calls with user and session JWT scopes; chat binds threads to session ids |
 | Settings | `src/core/config.py:1` | Existe | Loads typed settings from env vars with documented defaults |
 | Cache | `src/core/cache.py:1` | Existe | Valkey front with in-memory TTL fallback for recall |
 | Memory | `src/services/memory.py:1` | Existe | Per-user namespaces plus extract plus background writer over `BaseStore` |
@@ -75,7 +75,7 @@ Each step below runs in order for one user message.
 7. Memory extraction plus store runs as Starlette background tasks after the reply without slowing the chat path.
 8. The final message returns to Studio.
 
-Auth and rate limits are planned with `src/api/` and `src/services/`; recall uses transitional `X-User-ID` until session tokens land, and production ignores that header.
+Auth and rate limits are live in `src/api/` plus `src/services/`; chat requires a session token and threads bind to session ids.
 
 ## Agent graph
 

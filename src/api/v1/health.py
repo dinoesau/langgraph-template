@@ -7,7 +7,12 @@ router = APIRouter(tags=["health"])
 
 
 class HealthResponse(BaseModel):
-    """Service plus dependency readiness, no ORM types cross here."""
+    """Service plus dependency readiness, no ORM types cross here.
+
+    Checks stay static process-shape by design: dependency fail-fast happens
+    at boot in the lifespan (unreachable store or empty secret raises before
+    serving), so health reports liveness, not per-request probe results.
+    """
 
     status: str
     checks: dict[str, str]

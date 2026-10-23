@@ -68,8 +68,21 @@ Local runs read `.env`, deployed runs use real environment values.
 | `MAX_LLM_CALL_RETRIES` | `3` | live | Attempts per model before fallback |
 | `LLM_TOTAL_TIMEOUT_SECONDS` | `60` | live | Total budget for the retry plus fallback cycle |
 | `MAX_TOKENS` | planned | planned | Cap per LLM response |
-| `JWT_SECRET_KEY` | planned | planned | Signs auth tokens once the auth layer exists |
+| `JWT_SECRET_KEY` | empty | live | Signs auth tokens, fails closed when empty |
+| `JWT_ALGORITHM` | `HS256` | live | JWT signing algorithm |
+| `JWT_USER_EXPIRE_MINUTES` | `30` | live | User token lifetime in minutes |
+| `JWT_SESSION_EXPIRE_MINUTES` | `60` | live | Session token lifetime in minutes |
 | `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
+
+## Rate limits
+
+Register allows 3 requests per minute per IP, login allows 5 per minute per IP.
+Limits are enforced in `src/core/limiter.py:1` with per-process memory storage.
+Session create, chat, rename, and delete carry no limits in this slice: they
+require valid tokens, so brute force is not the threat and abuse control is
+a follow-up. Per-account login throttling is also deferred: keying on the
+form address is infeasible in a sync key function, and IP limits plus argon2
+cost plus generic errors are the spec controls against credential stuffing.
 
 ## Validation
 

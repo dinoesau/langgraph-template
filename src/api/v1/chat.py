@@ -1,18 +1,17 @@
 """Chat over HTTP: thin translation into loop invoke and stream calls."""
 
 import json
-import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
 from starlette.background import BackgroundTask
 
 from agent.graph import AgentGraph
-from api.deps import WriterHook, get_memory_writer, get_request_graph, get_request_user_id
+from api.deps import SessionContext, WriterHook, get_memory_writer, get_request_graph, require_scope
 from services.memory import snapshot_messages
 
 router = APIRouter(tags=["chat"])
@@ -22,7 +21,6 @@ class ChatRequest(BaseModel):
     """Inbound chat shape, parsed once at the HTTP edge."""
 
     message: str
-    thread_id: str | None = None
 
     @field_validator("message")
     @classmethod
@@ -70,30 +68,41 @@ async def _stream_loop(
     box["reply"] = "".join(texts)
 
 
+def _session_thread(ctx: SessionContext) -> str:
+    """Return the server-authoritative thread for one session context."""
+    if ctx.session_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session token is missing its session",
+        )
+    return ctx.session_id
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     body: ChatRequest,
+    ctx: Annotated[SessionContext, Security(require_scope("session"), scopes=["session"])],
     agent: Annotated[AgentGraph, Depends(get_request_graph)],
-    user_id: Annotated[str, Depends(get_request_user_id)],
     writer: Annotated[WriterHook, Depends(get_memory_writer)],
     background: BackgroundTasks,
 ) -> ChatResponse:
-    """Delegate one turn to the loop and persist memories after the reply."""
-    thread_id = body.thread_id or uuid.uuid4().hex
-    reply = await _invoke_loop(agent, body.message, thread_id, user_id)
-    background.add_task(writer, user_id, snapshot_messages(body.message, reply))
+    """Delegate one turn to the loop on the session thread."""
+    thread_id = _session_thread(ctx)
+    reply = await _invoke_loop(agent, body.message, thread_id, ctx.user_id)
+    background.add_task(writer, ctx.user_id, snapshot_messages(body.message, reply))
     return ChatResponse(reply=reply, thread_id=thread_id)
 
 
 @router.post("/chat/stream")
 def chat_stream(
     body: ChatRequest,
+    ctx: Annotated[SessionContext, Security(require_scope("session"), scopes=["session"])],
     agent: Annotated[AgentGraph, Depends(get_request_graph)],
-    user_id: Annotated[str, Depends(get_request_user_id)],
     writer: Annotated[WriterHook, Depends(get_memory_writer)],
 ) -> StreamingResponse:
-    """Delegate one turn to the loop, stream it, then persist memories."""
-    thread_id = body.thread_id or uuid.uuid4().hex
+    """Delegate one turn to the loop, stream it on the session thread."""
+    thread_id = _session_thread(ctx)
+    user_id = ctx.user_id
     box: dict[str, str] = {}
 
     async def _write_after() -> None:

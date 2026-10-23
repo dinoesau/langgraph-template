@@ -164,7 +164,7 @@ Wire with `add_conditional_edges`.
 ### `src/api/v1/`
 
 This layer translates HTTP to `graph.invoke` or `graph.stream`.
-It owns request schemas plus health plus chat, auth and session scoping arrive with the auth lifecycle.
+It owns request schemas plus health plus chat plus auth with user and session scopes.
 It never defines nodes, edges, or prompts.
 
 ### `src/core/`

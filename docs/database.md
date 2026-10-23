@@ -1,8 +1,8 @@
 # Database
 
 Estado: parcial.
-El checkpointer por fabrica, las migraciones con frontera, el schema de app y la memoria semantica ya existen.
-La extraccion LLM y auth siguen planeados.
+El checkpointer por fabrica, las migraciones con frontera, el schema de app, la memoria semantica y auth ya existen.
+La extraccion LLM sigue planeada.
 Este documento describe el diseno objetivo adaptado a este starter.
 
 ## Donde vive
@@ -40,7 +40,7 @@ erDiagram
 User representa una cuenta con email unico.
 Session representa una conversacion y un usuario puede tener muchas.
 Session copia el username al crearse para evitar una lectura extra en cada chat.
-Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapeara a Session cuando aterricen los tokens de sesion.
+Thread no tiene tabla de app: el hilo vive en el checkpointer y se mapea a Session via `thread_id == session.id` bajo token de sesion.
 Las tablas del checkpointer las gestiona LangGraph y no Alembic.
 Esas tablas son `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` y `checkpoint_migrations`.
 Las tablas del store `store`, `store_vectors` y `store_migrations` las gestiona LangGraph y tampoco Alembic.
@@ -59,7 +59,9 @@ Las tools `get_availability` y `book_appointment` viven en `src/agent/tools/book
 ## Migraciones con Alembic
 
 Alembic es dueno del schema de app.
-La app nunca llama a `create_all()` en el arranque.
+En Postgres la app nunca llama a `create_all()` en el arranque.
+Con SQLite en memoria (sin `POSTGRES_URI`) el arranque crea el schema de app
+para demos y tests; `tests/unit_tests/test_auth_store.py` fija la paridad con la migracion.
 Aplica las migraciones con `uv run alembic upgrade head`.
 Genera una migracion con `uv run alembic revision --autogenerate -m "describe el cambio"`.
 Revisa el archivo generado en `alembic/versions/:1` antes de aplicarlo.

@@ -10,6 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Proven configuration values, parsed once at the edge."""
 
+    # extra="ignore" is deliberate: the env carries non-model keys
+    # (e.g. LANGSMITH_API_KEY passthrough) that must not fail boot.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: Literal["development", "staging", "production"] = "development"
@@ -30,6 +32,11 @@ class Settings(BaseSettings):
     default_llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_llm_call_retries: int = Field(default=3, ge=1, le=10)
     llm_total_timeout_seconds: int = Field(default=60, ge=5, le=600)
+    # Auth lifecycle (S4). Empty secret fails closed at token creation.
+    jwt_secret_key: str = ""
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_user_expire_minutes: int = Field(default=30, ge=5, le=1440)
+    jwt_session_expire_minutes: int = Field(default=60, ge=5, le=1440)
 
 
 @lru_cache

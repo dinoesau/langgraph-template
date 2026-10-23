@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
+from sqlalchemy import text
 
 from agent.graph import AgentGraph, graph, make_the_agent
 from core.cache import RecallCache, build_cache
@@ -78,6 +79,22 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         llm: Any | None = LlmService.from_settings(settings)
     except ValueError:
         llm = None
+    from models.base import Base
+    from services.auth_store import auth_session_factory, create_auth_engine
+
+    if not settings.jwt_secret_key.strip():
+        raise RuntimeError("JWT_SECRET_KEY must be set to serve auth")
+    auth_engine = create_auth_engine(
+        postgres_uri or "sqlite:///:memory:",
+        pool_size=settings.postgres_pool_max_size,
+    )
+    if "sqlite" in str(auth_engine.url):
+        async with auth_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    async with auth_engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+    app.state.auth_engine = auth_engine
+    app.state.auth_session_factory = auth_session_factory(auth_engine)
     async with AsyncExitStack() as stack:
         saver: Any = None
         store: BaseStore
@@ -109,3 +126,4 @@ async def agent_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         finally:
             cache.close_sync()
             await cache.aclose()
+            await auth_engine.dispose()
