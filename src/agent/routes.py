@@ -14,3 +14,10 @@ from agent.state import GraphState
 def should_continue(state: GraphState) -> Literal["tools", "__end__"]:
     """Return the tools branch when the last AI message holds tool calls."""
     return tools_condition(cast(dict[str, Any], state))
+
+
+def grade_route(state: GraphState) -> Literal["drafter", "end"]:
+    """Return the grader-loop branch; feedback present means re-draft."""
+    if state.get("grade_feedback"):
+        return "drafter"
+    return "end"
