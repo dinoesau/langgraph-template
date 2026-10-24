@@ -28,6 +28,9 @@ class GradeVerdict(BaseModel):
     feedback: str = ""
 
 
+DRAFT_DEGRADED = "Thanks for reaching out. I will follow up shortly."
+
+
 def _text(result: Any) -> str:
     """Extract reply text; non-string blocks stringify at the edge."""
     content = result.content if isinstance(result, AIMessage) else result
@@ -74,7 +77,11 @@ def build_drafter_sync(llm: Any) -> Any:
         prompt: list[BaseMessage] = [
             SystemMessage(content="Write a polite customer-support reply.")
         ] + history
-        result = llm.call(prompt)
+        try:
+            result = llm.call(prompt)
+        except Exception as exc:  # noqa: BLE001 - drafter failure still grades
+            logger.warning("drafter degraded: %s", exc)
+            return {"messages": [AIMessage(content=DRAFT_DEGRADED)]}
         content = _text(result)
         return {"messages": [AIMessage(content=content)]}
 
@@ -97,7 +104,11 @@ def build_drafter_async(llm: Any) -> Any:
         prompt: list[BaseMessage] = [
             SystemMessage(content="Write a polite customer-support reply.")
         ] + history
-        result = await llm.acall(prompt)
+        try:
+            result = await llm.acall(prompt)
+        except Exception as exc:  # noqa: BLE001 - drafter failure still grades
+            logger.warning("drafter degraded: %s", exc)
+            return {"messages": [AIMessage(content=DRAFT_DEGRADED)]}
         content = _text(result)
         return {"messages": [AIMessage(content=content)]}
 
@@ -117,7 +128,11 @@ def build_grader_sync(llm: Any) -> Any:
             return {"attempts": 0, "grade_feedback": ""}
         if llm is None:
             return {"attempts": 0, "grade_feedback": ""}
-        result = llm.call(_grade_messages(_text(drafts[-1])), response_format=GradeVerdict)
+        try:
+            result = llm.call(_grade_messages(_text(drafts[-1])), response_format=GradeVerdict)
+        except Exception as exc:  # noqa: BLE001 - grader failure counts a rejection
+            logger.warning("grader degraded: %s", exc)
+            return {"attempts": attempts + 1, "grade_feedback": "grading unavailable"}
         verdict = _normalize_verdict(result)
         if verdict.approved:
             return {"attempts": 0, "grade_feedback": ""}
@@ -141,7 +156,13 @@ def build_grader_async(llm: Any) -> Any:
             return {"attempts": 0, "grade_feedback": ""}
         if llm is None:
             return {"attempts": 0, "grade_feedback": ""}
-        result = await llm.acall(_grade_messages(_text(drafts[-1])), response_format=GradeVerdict)
+        try:
+            result = await llm.acall(
+                _grade_messages(_text(drafts[-1])), response_format=GradeVerdict
+            )
+        except Exception as exc:  # noqa: BLE001 - grader failure counts a rejection
+            logger.warning("grader degraded: %s", exc)
+            return {"attempts": attempts + 1, "grade_feedback": "grading unavailable"}
         verdict = _normalize_verdict(result)
         if verdict.approved:
             return {"attempts": 0, "grade_feedback": ""}

@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from agent.grader import (
     GradeVerdict,
     build_drafter_sync,
+    build_grader_async,
     build_grader_graph,
     build_grader_sync,
 )
@@ -76,6 +77,37 @@ def test_no_llm_approves_without_grading() -> None:
     result = demo.invoke(fixed_state("My refund is late"))
     assert result["messages"][-1].content == "Echo: My refund is late"
     assert (result.get("attempts") or 0) == 0
+
+
+def test_drafter_degrades_to_placeholder_on_model_failure() -> None:
+    drafter = build_drafter_sync(FakeLlm(failures=1))
+    result = drafter(fixed_state("My refund is late"))
+    assert result["messages"][-1].content == "Thanks for reaching out. I will follow up shortly."
+
+
+def test_grader_counts_failure_as_rejection() -> None:
+    grader = build_grader_sync(FakeLlm(failures=1))
+    state = cast(GraphState, {"messages": [AIMessage(content="A draft.")]})
+    rejected = grader(state)
+    assert rejected["attempts"] == 1
+    assert rejected["grade_feedback"] == "grading unavailable"
+
+
+def test_grader_rejects_unparseable_verdict() -> None:
+    grader = build_grader_sync(FakeLlm(["??? gibberish ???"]))
+    state = cast(GraphState, {"messages": [AIMessage(content="A draft.")]})
+    rejected = grader(state)
+    assert rejected["attempts"] == 1
+    assert rejected["grade_feedback"] == "unparseable verdict"
+
+
+def test_async_grader_counts_failure_as_rejection() -> None:
+    async def run() -> Any:
+        grader = build_grader_async(FakeLlm(failures=1))
+        state = cast(GraphState, {"messages": [AIMessage(content="A draft.")]})
+        return await grader(state)
+
+    assert asyncio.run(run())["attempts"] == 1
 
 
 def test_drafter_rejects_blank_input() -> None:
