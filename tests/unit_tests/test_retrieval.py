@@ -32,6 +32,13 @@ def _make_demo(llm: FakeLlm, seed: bool) -> Any:
     return builder.compile(store=make_store(seed=seed))
 
 
+class FailingLlm(FakeLlm):
+    """Fake llm that raises on every call to prove the degrade path."""
+
+    def _next(self) -> AIMessage:
+        raise RuntimeError("fake llm failure")
+
+
 def test_retrieve_fills_passages_for_policy_question() -> None:
     demo = _make_demo(FakeLlm(["Refunds within 30 days [1]"]), seed=True)
     result = demo.invoke(fixed_state("what is your refund policy"))
@@ -57,7 +64,21 @@ def test_generate_answers_unknown_when_store_empty() -> None:
     assert llm.calls == []
 
 
-def test_retrieve_overwrites_stale_passages_each_turn() -> None:
+def test_generate_degrades_to_unknown_on_model_failure() -> None:
+    llm = FailingLlm()
+    demo = _make_demo(llm, seed=True)
+    result = demo.invoke(fixed_state("what is your refund policy"))
+    assert result["messages"][-1].content == UNKNOWN
+    assert len(llm.calls) == 1
+
+
+def test_grounded_prompt_delimits_passages_as_data() -> None:
+    llm = FakeLlm(["cited [1]"])
+    demo = _make_demo(llm, seed=True)
+    demo.invoke(fixed_state("what is your refund policy"))
+    system_text = str(llm.calls[0][0].content)
+    assert "<passages>" in system_text
+    assert "Refund" in system_text.split("<passages>")[1]
     demo = _make_demo(FakeLlm(["ok [1]"]), seed=True)
     result = demo.invoke({**fixed_state("refund policy"), "passages": ["stale"]})
     assert result.get("passages") != ["stale"]

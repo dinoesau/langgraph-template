@@ -69,14 +69,19 @@ async def _retrieve_async(state: GraphState) -> dict[str, list[Any]]:
 
 
 def _grounded_messages(passages: list[str], question: str, recall: str) -> list[BaseMessage]:
-    """Policy passages as primary source, recall string as extra context only."""
+    """Policy passages as data, recall as extra context, question untouched.
+
+    Passages and recall arrive inside explicit boundary tags so retrieved
+    text can never read as instructions; only the fixed system sentence
+    instructs, and the user question travels as a human message.
+    """
     cited = "\n".join(f"[{index + 1}] {chunk}" for index, chunk in enumerate(passages))
     prompt = (
         "Answer using only the policy passages below. Cite the passage "
-        f"numbers you rely on.\nPassages:\n{cited}"
+        "numbers you rely on.\n<passages>\n" + cited + "\n</passages>"
     )
     if recall.strip():
-        prompt += f"\nExtra context:\n{recall.strip()}"
+        prompt += "\n<extra_context>\n" + recall.strip() + "\n</extra_context>"
     return [SystemMessage(content=prompt), HumanMessage(content=question)]
 
 
@@ -122,7 +127,12 @@ def build_generate_sync(llm: Any) -> Any:
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")]}
         recall = (state.get("docs") or [""])[0] if state.get("docs") else ""
-        return {"messages": [_as_ai(llm.call(_grounded_messages(passages, text, recall)))]}
+        try:
+            result = llm.call(_grounded_messages(passages, text, recall))
+        except Exception as exc:  # noqa: BLE001 - model failure yields unknown
+            logger.warning("generate degraded: %s", exc)
+            return {"messages": [AIMessage(content=UNKNOWN)]}
+        return {"messages": [_as_ai(result)]}
 
     return generate_sync
 
@@ -140,7 +150,11 @@ def build_generate_async(llm: Any) -> Any:
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")]}
         recall = (state.get("docs") or [""])[0] if state.get("docs") else ""
-        result = await llm.acall(_grounded_messages(passages, text, recall))
+        try:
+            result = await llm.acall(_grounded_messages(passages, text, recall))
+        except Exception as exc:  # noqa: BLE001 - model failure yields unknown
+            logger.warning("generate degraded: %s", exc)
+            return {"messages": [AIMessage(content=UNKNOWN)]}
         return {"messages": [_as_ai(result)]}
 
     return generate_async
