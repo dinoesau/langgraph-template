@@ -114,13 +114,13 @@ def build_grader_sync(llm: Any) -> Any:
         attempts = state.get("attempts") or 0
         if attempts >= 2:
             logger.warning("grader guard: accepting last draft after %d rejections", attempts)
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         if llm is None:
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         result = llm.call(_grade_messages(_text(drafts[-1])), response_format=GradeVerdict)
         verdict = _normalize_verdict(result)
         if verdict.approved:
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         return {"attempts": attempts + 1, "grade_feedback": verdict.feedback}
 
     return grader_sync
@@ -138,13 +138,13 @@ def build_grader_async(llm: Any) -> Any:
         attempts = state.get("attempts") or 0
         if attempts >= 2:
             logger.warning("grader guard: accepting last draft after %d rejections", attempts)
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         if llm is None:
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         result = await llm.acall(_grade_messages(_text(drafts[-1])), response_format=GradeVerdict)
         verdict = _normalize_verdict(result)
         if verdict.approved:
-            return {"grade_feedback": ""}
+            return {"attempts": 0, "grade_feedback": ""}
         return {"attempts": attempts + 1, "grade_feedback": verdict.feedback}
 
     return grader_async
