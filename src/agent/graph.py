@@ -42,6 +42,9 @@ __all__ = ["AgentGraph", "RecallCachePort", "graph", "make_the_agent"]
 
 AgentGraph = CompiledStateGraph[Any, Any, Any, Any]
 
+DEFAULT_RECURSION_LIMIT = 25
+"""Cap on super-steps per turn; each chat plus tools cycle costs model calls."""
+
 
 def make_the_agent(
     checkpointer: BaseCheckpointSaver[str] | None = None,

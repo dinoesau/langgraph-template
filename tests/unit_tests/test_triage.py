@@ -5,8 +5,10 @@ uses a scripted fake, and end-to-end runs use the default echofallback
 or scripted tool-call replies.
 """
 
+import asyncio
 from typing import Any, cast
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.graph import graph, make_the_agent
@@ -112,6 +114,52 @@ def test_bad_input_fails_fast_at_triage() -> None:
     except ValueError:
         return
     raise AssertionError("blank input must raise ValueError")
+
+
+def test_end_to_end_ambiguous_input_goes_through_assist() -> None:
+    llm = FakeLlm(["booking", "Sure, I can help with that booking."])
+    agent = make_the_agent(llm=llm)
+    result = agent.invoke(
+        {"messages": [HumanMessage(content="refund status for my booking tomorrow")]}
+    )
+    assert result.get("triage_decision") == "booking"
+    assert result["messages"][-1].content == "Sure, I can help with that booking."
+    assert "booking" in str(llm.calls[0][0].content).lower()
+
+
+def test_end_to_end_ambiguous_input_async() -> None:
+    async def run() -> Any:
+        llm = FakeLlm(["retrieval", "Cited answer [1]."])
+        agent = make_the_agent(llm=llm)
+        return await agent.ainvoke(
+            {"messages": [HumanMessage(content="refund and booking clash tomorrow")]}
+        )
+
+    result = asyncio.run(run())
+    assert result.get("triage_decision") == "retrieval"
+
+
+def test_stubborn_tool_loop_hits_recursion_cap() -> None:
+    from langgraph.errors import GraphRecursionError
+
+    stubborn = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "get_availability",
+                "args": {"date": "tomorrow"},
+                "id": "s",
+                "type": "tool_call",
+            }
+        ],
+    )
+    llm = FakeLlm([stubborn, stubborn, stubborn, stubborn])
+    agent = make_the_agent(llm=llm)
+    with pytest.raises(GraphRecursionError):
+        agent.invoke(
+            {"messages": [HumanMessage(content="book me tomorrow")]},
+            config={"recursion_limit": 3},
+        )
 
 
 class LabelLlm(FakeLlm):

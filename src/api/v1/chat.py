@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, field_validator
 from starlette.background import BackgroundTask
 
-from agent.graph import AgentGraph
+from agent.graph import DEFAULT_RECURSION_LIMIT, AgentGraph
 from api.deps import SessionContext, WriterHook, get_memory_writer, get_request_graph, require_scope
 from services.memory import snapshot_messages
 
@@ -42,7 +42,10 @@ async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str, user_id:
     """Run one loop turn on its thread and return the assistant text."""
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
+        config={
+            "configurable": {"thread_id": thread_id, "user_id": user_id},
+            "recursion_limit": DEFAULT_RECURSION_LIMIT,
+        },
     )
     last = result["messages"][-1]
     if isinstance(last, AIMessage) and isinstance(last.content, str):
@@ -57,7 +60,10 @@ async def _stream_loop(
     texts: list[str] = []
     async for chunk in agent.astream(
         {"messages": [HumanMessage(content=message)]},
-        config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
+        config={
+            "configurable": {"thread_id": thread_id, "user_id": user_id},
+            "recursion_limit": DEFAULT_RECURSION_LIMIT,
+        },
         stream_mode="updates",
     ):
         for node_output in chunk.values():
