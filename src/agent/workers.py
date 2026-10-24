@@ -21,6 +21,22 @@ logger = logging.getLogger("agent")
 DEGRADED = "unknown"
 
 
+def _text(result: Any) -> str:
+    """Extract reply text; non-string blocks stringify at the edge."""
+    content = result.content if isinstance(result, AIMessage) else result
+    if isinstance(content, str):
+        return content
+    return str(content)
+
+
+def _clean(raw: str) -> str:
+    """First non-blank line, or empty when the reply carries no text."""
+    stripped = raw.strip()
+    if not stripped:
+        return ""
+    return stripped.splitlines()[0].strip()
+
+
 def _classify(llm: Any, kind: str, choices: str, text: str) -> str:
     """Run one classifier; degrade the field on any failure."""
     if llm is None:
@@ -34,9 +50,7 @@ def _classify(llm: Any, kind: str, choices: str, text: str) -> str:
     except Exception as exc:  # noqa: BLE001 - worker failure degrades the field
         logger.warning("worker %s degraded: %s", kind, exc)
         return DEGRADED
-    content = result.content if isinstance(result, AIMessage) else str(result)
-    clean = content.strip().splitlines()[0].strip() if content.strip() else ""
-    return clean or DEGRADED
+    return _clean(_text(result)) or DEGRADED
 
 
 async def _classify_async(llm: Any, kind: str, choices: str, text: str) -> str:
@@ -52,9 +66,7 @@ async def _classify_async(llm: Any, kind: str, choices: str, text: str) -> str:
     except Exception as exc:  # noqa: BLE001 - worker failure degrades the field
         logger.warning("worker %s degraded: %s", kind, exc)
         return DEGRADED
-    content = result.content if isinstance(result, AIMessage) else str(result)
-    clean = content.strip().splitlines()[0].strip() if content.strip() else ""
-    return clean or DEGRADED
+    return _clean(_text(result)) or DEGRADED
 
 
 def _ticket_text(state: GraphState) -> str | None:
