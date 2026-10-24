@@ -48,6 +48,7 @@ Done when a rude first draft converges to an approved reply within the guard.
 
 ## Shared wiring
 
-All graphs use `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
+The main chat graph uses `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
+Ticket summarization and draft grading are standalone demo graphs compiled by `build_ticket_graph` and `build_grader_graph`; they share `GraphState` but run outside the chat loop.
 Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
 Long term memory lives in `src/services/memory.py:1` with cache in `src/core/cache.py:1`.

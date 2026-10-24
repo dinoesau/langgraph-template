@@ -19,9 +19,17 @@ from tests.unit_tests.fakes import FakeLlm, fixed_state
 def test_rule_families_route_to_the_right_branch() -> None:
     assert triage_route(fixed_state("what is your refund policy")) == "retrieval"
     assert triage_route(fixed_state("what is my ticket status")) == "retrieval"
+    assert triage_route(fixed_state("our return policies")) == "retrieval"
     assert triage_route(fixed_state("book me tomorrow 10am")) == "booking"
     assert triage_route(fixed_state("is there a slot at 3pm")) == "booking"
+    assert triage_route(fixed_state("check my reservations")) == "booking"
     assert triage_route(fixed_state("hello there")) == "chat"
+
+
+def test_substring_lookalikes_do_not_route() -> None:
+    assert triage_route(fixed_state("sometimes I wonder")) == "chat"
+    assert triage_route(fixed_state("here is my update")) == "chat"
+    assert triage_route(fixed_state("rebook my flight")) == "chat"
 
 
 def test_both_families_go_to_assist() -> None:
@@ -46,6 +54,12 @@ def test_assist_falls_back_without_model() -> None:
     assert assist(fixed_state("just saying hi")) == {"triage_decision": "chat"}
 
 
+def test_assist_degrades_to_fallback_on_model_failure() -> None:
+    assist = build_triage_assist_sync(FakeLlm(failures=2))
+    assert assist(fixed_state("refund and booking clash")) == {"triage_decision": "retrieval"}
+    assert assist(fixed_state("book and date clash")) == {"triage_decision": "booking"}
+
+
 def test_assist_unparseable_falls_to_chat() -> None:
     assist = build_triage_assist_sync(FakeLlm(["maybe"]))
     assert assist(fixed_state("refund and booking clash")) == {"triage_decision": "chat"}
@@ -65,6 +79,13 @@ def test_end_to_end_retrieval_branch_answers_unknown() -> None:
 def test_end_to_end_chat_branch_echoes() -> None:
     result = graph.invoke({"messages": [HumanMessage(content="hello there")]})
     assert result["messages"][-1].content == "Echo: hello there"
+
+
+def test_chat_branch_clears_stale_passages() -> None:
+    state = cast(Any, {"messages": [HumanMessage(content="hello there")], "passages": ["stale"]})
+    result = graph.invoke(state)
+    assert result["messages"][-1].content == "Echo: hello there"
+    assert result.get("passages") == []
 
 
 def test_end_to_end_booking_branch_runs_tool_loop() -> None:

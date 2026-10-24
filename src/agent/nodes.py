@@ -187,15 +187,23 @@ def build_recall_async(cache: RecallCachePort | None, ttl: int) -> Any:
     return recall_async
 
 
+def _stale_passages(state: GraphState) -> dict[str, list[str]]:
+    """Clear retrieval output on non-retrieval entry; absent stays absent."""
+    if state.get("passages"):
+        return {"passages": []}
+    return {}
+
+
 def build_chat_sync(llm: Any, tool_list: Sequence[Any]) -> Any:
     """Return the sync chat node; echo fallback keeps fresh clones green."""
 
     def chat_sync(state: GraphState, config: RunnableConfig | None = None) -> dict[str, list[Any]]:
         text = last_human_text(state.get("messages", []))
         if llm is None:
-            return {"messages": [AIMessage(content=f"Echo: {text}")]}
+            return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
         return {
-            "messages": [_wrap_ai(llm.call(_chat_call_messages(state), list(tool_list) or None))]
+            "messages": [_wrap_ai(llm.call(_chat_call_messages(state), list(tool_list) or None))],
+            **_stale_passages(state),
         }
 
     return chat_sync
@@ -209,8 +217,8 @@ def build_chat_async(llm: Any, tool_list: Sequence[Any]) -> Any:
     ) -> dict[str, list[Any]]:
         text = last_human_text(state.get("messages", []))
         if llm is None:
-            return {"messages": [AIMessage(content=f"Echo: {text}")]}
+            return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
         result = await llm.acall(_chat_call_messages(state), list(tool_list) or None)
-        return {"messages": [_wrap_ai(result)]}
+        return {"messages": [_wrap_ai(result)], **_stale_passages(state)}
 
     return chat_async

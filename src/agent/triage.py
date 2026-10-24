@@ -14,7 +14,12 @@ from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel
 
 from agent.nodes import last_human_text
-from agent.routes import BOOKING_WORDS, RETRIEVAL_WORDS, TriageTarget
+from agent.routes import (
+    BOOKING_WORDS,
+    RETRIEVAL_WORDS,
+    TriageTarget,
+    match_family,
+)
 from agent.state import GraphState
 
 logger = logging.getLogger("agent")
@@ -53,11 +58,30 @@ def _assist_messages(text: str) -> list[BaseMessage]:
 def _fallback_label(text: str) -> TriageTarget:
     """Deterministic no-model assist; refund wording wins ties."""
     lowered = text.lower()
-    if any(word in lowered for word in RETRIEVAL_WORDS):
+    if match_family(lowered, RETRIEVAL_WORDS):
         return "retrieval"
-    if any(word in lowered for word in BOOKING_WORDS):
+    if match_family(lowered, BOOKING_WORDS):
         return "booking"
     return "chat"
+
+
+def _assist_label(llm: Any, text: str) -> TriageTarget:
+    """Model assist with deterministic fallback when the model fails."""
+    try:
+        return _normalize_label(llm.call(_assist_messages(text), response_format=TriageLabel))
+    except Exception as exc:  # noqa: BLE001 - assist failure falls back to rules
+        logger.warning("triage assist degraded: %s", exc)
+        return _fallback_label(text)
+
+
+async def _assist_label_async(llm: Any, text: str) -> TriageTarget:
+    """Model assist with deterministic fallback when the model fails."""
+    try:
+        result = await llm.acall(_assist_messages(text), response_format=TriageLabel)
+    except Exception as exc:  # noqa: BLE001 - assist failure falls back to rules
+        logger.warning("triage assist degraded: %s", exc)
+        return _fallback_label(text)
+    return _normalize_label(result)
 
 
 def build_triage_assist_sync(llm: Any) -> Any:
@@ -69,8 +93,7 @@ def build_triage_assist_sync(llm: Any) -> Any:
         text = last_human_text(state.get("messages", []))
         if llm is None:
             return {"triage_decision": _fallback_label(text)}
-        result = llm.call(_assist_messages(text), response_format=TriageLabel)
-        return {"triage_decision": _normalize_label(result)}
+        return {"triage_decision": _assist_label(llm, text)}
 
     return triage_assist_sync
 
@@ -84,7 +107,6 @@ def build_triage_assist_async(llm: Any) -> Any:
         text = last_human_text(state.get("messages", []))
         if llm is None:
             return {"triage_decision": _fallback_label(text)}
-        result = await llm.acall(_assist_messages(text), response_format=TriageLabel)
-        return {"triage_decision": _normalize_label(result)}
+        return {"triage_decision": await _assist_label_async(llm, text)}
 
     return triage_assist_async

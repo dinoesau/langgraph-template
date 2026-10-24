@@ -4,6 +4,7 @@ Thin wrapper over the prebuilt ``tools_condition`` so the seam stays
 documented here while the branching logic stays canonical.
 """
 
+import re
 from typing import Any, Literal, cast
 
 from langgraph.prebuilt import tools_condition
@@ -13,34 +14,47 @@ from agent.state import GraphState
 
 TriageTarget = Literal["retrieval", "booking", "chat"]
 
-RETRIEVAL_WORDS = ("refund", "return", "policy", "status", "warranty", "guarantee")
+RETRIEVAL_WORDS = (
+    "refund",
+    "refunds",
+    "return",
+    "returns",
+    "policy",
+    "policies",
+    "status",
+    "warranty",
+    "warranties",
+    "guarantee",
+    "guarantees",
+)
 BOOKING_WORDS = (
     "date",
+    "dates",
     "time",
+    "times",
     "slot",
+    "slots",
     "book",
+    "books",
+    "booked",
+    "booking",
     "appointment",
+    "appointments",
     "tomorrow",
     "schedule",
+    "schedules",
+    "scheduled",
     "available",
     "availability",
     "reserve",
+    "reservation",
+    "reservations",
 )
 
 
-RETRIEVAL_WORDS = ("refund", "return", "policy", "status", "warranty", "guarantee")
-BOOKING_WORDS = (
-    "date",
-    "time",
-    "slot",
-    "book",
-    "appointment",
-    "tomorrow",
-    "schedule",
-    "available",
-    "availability",
-    "reserve",
-)
+def match_family(text: str, words: tuple[str, ...]) -> bool:
+    """Whole-word match over explicit variants; extend tuples, never stems."""
+    return any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
 
 
 def should_continue(state: GraphState) -> Literal["tools", "__end__"]:
@@ -51,8 +65,8 @@ def should_continue(state: GraphState) -> Literal["tools", "__end__"]:
 def triage_route(state: GraphState) -> Literal["retrieval", "booking", "chat", "triage_assist"]:
     """Route by rule first; both families matched means genuine ambiguity."""
     text = last_human_text(state.get("messages", [])).lower()
-    refund = any(word in text for word in RETRIEVAL_WORDS)
-    booking = any(word in text for word in BOOKING_WORDS)
+    refund = match_family(text, RETRIEVAL_WORDS)
+    booking = match_family(text, BOOKING_WORDS)
     if refund and booking:
         return "triage_assist"
     if refund:
