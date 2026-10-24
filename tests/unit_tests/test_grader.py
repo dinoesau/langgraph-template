@@ -5,12 +5,18 @@ fakes. Call order is sequential, so scripted reply queues stay deterministic.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from agent.grader import GradeVerdict, build_drafter_sync, build_grader_graph
+from agent.grader import (
+    GradeVerdict,
+    build_drafter_sync,
+    build_grader_graph,
+    build_grader_sync,
+)
 from agent.routes import grade_route
+from agent.state import GraphState
 from tests.unit_tests.fakes import FakeLlm, fixed_state
 
 
@@ -28,7 +34,7 @@ def test_rude_draft_converges_to_approved_reply() -> None:
     assert (
         result["messages"][-1].content == "We are sorry for the trouble. Your refund is on the way."
     )
-    assert (result.get("attempts") or 0) == 1
+    assert (result.get("attempts") or 0) == 0
     assert not result.get("grade_feedback")
     assert "rude tone" in str(llm.calls[2])
 
@@ -38,16 +44,26 @@ def test_guard_accepts_last_draft() -> None:
     demo = build_grader_graph(llm)
     result = demo.invoke(fixed_state("My refund is late"))
     assert result["messages"][-1].content == "Still rude."
-    assert (result.get("attempts") or 0) == 2
+    assert (result.get("attempts") or 0) == 0
     assert not result.get("grade_feedback")
     assert len(llm.calls) == 5
+
+
+def test_guard_disengages_for_next_turn() -> None:
+    grader = build_grader_sync(FakeLlm(["REJECT: still curt"]))
+    guarded = cast(GraphState, {"messages": [HumanMessage(content="late")], "attempts": 2})
+    assert grader(guarded) == {"attempts": 0, "grade_feedback": ""}
+    fresh = cast(
+        GraphState, {"messages": [AIMessage(content="Another try."), *guarded["messages"]]}
+    )
+    assert grader(fresh)["attempts"] == 1
 
 
 def test_structured_verdict_path() -> None:
     llm = VerdictLlm()
     demo = build_grader_graph(llm)
     result = demo.invoke(fixed_state("My refund is late"))
-    assert (result.get("attempts") or 0) == 2
+    assert (result.get("attempts") or 0) == 0
     assert result["messages"][-1].content == "A curt draft."
 
 
