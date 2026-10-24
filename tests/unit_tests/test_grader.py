@@ -51,11 +51,15 @@ def test_guard_accepts_last_draft() -> None:
 
 def test_guard_disengages_for_next_turn() -> None:
     grader = build_grader_sync(FakeLlm(["REJECT: still curt"]))
-    guarded = cast(GraphState, {"messages": [HumanMessage(content="late")], "attempts": 2})
-    assert grader(guarded) == {"attempts": 0, "grade_feedback": ""}
-    fresh = cast(
-        GraphState, {"messages": [AIMessage(content="Another try."), *guarded["messages"]]}
+    guarded = cast(
+        GraphState,
+        {
+            "messages": [HumanMessage(content="late"), AIMessage(content="Rude.")],
+            "attempts": 2,
+        },
     )
+    assert grader(guarded) == {"attempts": 0, "grade_feedback": ""}
+    fresh = cast(GraphState, {"messages": [AIMessage(content="Another try.")]})
     assert grader(fresh)["attempts"] == 1
 
 
