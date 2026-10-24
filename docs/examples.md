@@ -25,10 +25,11 @@ Done when an off-policy question gets "I don't know" instead of a hallucinated a
 
 ## 3. Router / triage
 
-Entry `intention_route` in `src/agent/routes.py:1` sends each request to RAG assistant, booking, or chat.
-Rule: refund/status questions go to the RAG assistant, date/time requests go to booking, everything else goes to chat.
-The booking node is a subgraph with its own ReAct loop from example 1.
-Done when all three trigger queries route to the right subgraph.
+Entry `triage_route` in `src/agent/routes.py:1` sends each request to RAG assistant, booking, or chat.
+Rule: refund or status wording goes to retrieval, date or time wording goes to booking, everything else goes to chat.
+Both families matched goes to the `triage_assist` node in `src/agent/triage.py:1`, which stores a validated `TriageLabel` and falls back to chat when unparseable.
+The booking branch reuses the chat plus tools loop as a subgraph sharing state and persistence.
+Done when all three trigger queries route to the right branch.
 
 ## 4. Parallel workers
 
@@ -40,13 +41,14 @@ Done when the card contains all three fields plus the ticket id.
 
 ## 5. Evaluator-optimizer
 
-A `generator` node drafts the reply and a `grader` node checks it via the model fallback with validated structured output (`GradeVerdict`) in `src/agent/grader.py:1`.
+A `drafter` node drafts the reply and a `grader` node checks it via the model fallback with validated structured output (`GradeVerdict`) in `src/agent/grader.py:1`.
 The pure `grade_route` in `src/agent/routes.py:1` sends rejections back with feedback and ends when feedback clears.
 Guard: at 2 completed rejections the grader accepts the last draft without another model call.
 Done when a rude first draft converges to an approved reply within the guard.
 
 ## Shared wiring
 
-All graphs use `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
+The main chat graph uses `make_the_agent(checkpointer, *, store, cache, cache_ttl_seconds, llm)` with `AsyncPostgresSaver` per `thread_id` per `docs/structure.md:140`.
+Ticket summarization and draft grading are standalone demo graphs compiled by `build_ticket_graph` and `build_grader_graph`; they share `GraphState` but run outside the chat loop.
 Checkpointer tables `checkpoints`, `checkpoint_blobs`, and `checkpoint_writes` belong to LangGraph per `docs/structure.md:192`.
 Long term memory lives in `src/services/memory.py:1` with cache in `src/core/cache.py:1`.
