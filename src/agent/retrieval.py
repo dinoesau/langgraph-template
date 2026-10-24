@@ -36,14 +36,14 @@ def _retrieve_sync(state: GraphState) -> dict[str, list[Any]]:
     try:
         text = last_human_text(state.get("messages", []))
     except ValueError:
-        return {"messages": []}
+        return {"passages": []}
     try:
         store = get_store()
     except Exception as exc:  # noqa: BLE001 - no store bound, skip retrieval
         logger.warning("retrieval degraded: %s", exc)
-        return {"messages": []}
+        return {"passages": []}
     if store is None:
-        return {"messages": []}
+        return {"passages": []}
     return {"passages": [item.strip() for item in _retrieve_texts(store, text) if item.strip()]}
 
 
@@ -51,20 +51,20 @@ async def _retrieve_async(state: GraphState) -> dict[str, list[Any]]:
     try:
         text = last_human_text(state.get("messages", []))
     except ValueError:
-        return {"messages": []}
+        return {"passages": []}
     try:
         store = get_store()
     except Exception as exc:  # noqa: BLE001 - no store bound, skip retrieval
         logger.warning("retrieval degraded: %s", exc)
-        return {"messages": []}
+        return {"passages": []}
     if store is None:
-        return {"messages": []}
+        return {"passages": []}
     try:
         hits = await store.asearch(passage_namespace(), query=text, limit=PASSAGE_TOP_K)
         texts = recall_texts(hits)
     except Exception as exc:  # noqa: BLE001 - store miss keeps the reply
         logger.warning("retrieval degraded: %s", exc)
-        return {"messages": []}
+        return {"passages": []}
     return {"passages": [item.strip() for item in texts if item.strip()]}
 
 

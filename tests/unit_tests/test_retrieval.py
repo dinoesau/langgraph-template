@@ -90,7 +90,13 @@ def test_retrieve_overwrites_stale_passages_each_turn() -> None:
 def test_retrieve_degrades_to_echo_without_store() -> None:
     result = graph.invoke({"messages": [HumanMessage(content="hello")]})
     assert result["messages"][-1].content == "Echo: hello"
-    assert result.get("passages") is None
+    assert result.get("passages") == []
+
+
+def test_miss_clears_stale_passages() -> None:
+    retrieve = build_retrieve_sync()
+    state = cast(GraphState, {**fixed_state("   "), "passages": ["stale"]})
+    assert retrieve(state) == {"passages": []}
 
 
 @pytest.mark.parametrize("text", ["", "   "])

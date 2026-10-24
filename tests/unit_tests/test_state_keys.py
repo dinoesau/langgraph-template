@@ -10,7 +10,7 @@ from agent.graph import graph
 
 def test_new_keys_absent_by_default() -> None:
     result = graph.invoke({"messages": [HumanMessage(content="hello")]})
-    assert result.get("passages") is None
+    assert result.get("passages") == []
     assert result.get("triage_decision") is None
     assert result.get("sentiment") is None
     assert result.get("urgency") is None
