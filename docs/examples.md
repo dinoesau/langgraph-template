@@ -32,9 +32,10 @@ Done when all three trigger queries route to the right subgraph.
 
 ## 4. Parallel workers
 
-Handles "summarize this ticket" by fanning out with `Send` to `sentiment`, `urgency`, and `category` workers.
-All workers read the same ticket text and write to a shared key in parallel.
-One `aggregator` node merges the three outputs into a single triage card.
+Handles "summarize this ticket" with three static workers plus one aggregator in `src/agent/workers.py:1`.
+All workers read the same ticket text and write disjoint keys (`sentiment`, `urgency`, `category`), so no reducer is needed.
+One `aggregator` node merges the three fields plus the ticket id into a single triage card.
+A worker failure degrades its field to unknown instead of dropping the card.
 Done when the card contains all three fields plus the ticket id.
 
 ## 5. Evaluator-optimizer

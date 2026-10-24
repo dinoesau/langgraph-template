@@ -20,11 +20,14 @@ POLICY_PASSAGES = [
 class FakeLlm:
     """Deterministic stand-in for LlmService with the same call surface."""
 
-    def __init__(self, replies: list[str] | None = None) -> None:
+    def __init__(self, replies: list[str] | None = None, failures: int = 0) -> None:
         self.replies = list(replies or [])
+        self.failures = failures
         self.calls: list[list[BaseMessage]] = []
 
     def _next(self) -> AIMessage:
+        if len(self.calls) <= self.failures:
+            raise RuntimeError("fake llm failure")
         if self.replies:
             return AIMessage(content=self.replies.pop(0))
         return AIMessage(content="Fake reply")
