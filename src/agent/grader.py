@@ -53,13 +53,17 @@ def _normalize_verdict(result: Any) -> GradeVerdict:
 
 
 def _grade_messages(draft: str) -> list[BaseMessage]:
-    """Grading prompt; the model replies with approval or actionable feedback."""
+    """Grading prompt; the model replies with approval or actionable feedback.
+
+    The draft travels inside explicit tags so untrusted ticket text can
+    never read as instructions.
+    """
     return [
         SystemMessage(
             content="You grade customer-support replies. Reply APPROVED when the draft "
             "is polite and resolves the request, else REJECT: plus one line of feedback."
         ),
-        HumanMessage(content=f"Draft to grade:\n{draft}"),
+        HumanMessage(content=f"Draft to grade:\n<draft>\n{draft}\n</draft>"),
     ]
 
 
