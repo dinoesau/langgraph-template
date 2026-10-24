@@ -3,7 +3,7 @@
 Without an llm the chat node echoes, so fresh clones stay green with no
 keys and no network. With an llm the same wiring runs the booking tools
 through the model fallback, which retries per model and walks the registry
-circularly once. Recall runs once per turn before chat, never per iteration.
+circularly once. Recall plus retrieval run once per turn before chat, never per iteration.
 """
 
 import logging
@@ -22,6 +22,7 @@ from agent.nodes import (
     build_recall_async,
     build_recall_sync,
 )
+from agent.retrieval import build_retrieve_async, build_retrieve_sync
 from agent.routes import should_continue
 from agent.state import GraphState
 from agent.tools import tools
@@ -53,15 +54,19 @@ def make_the_agent(
 
     recall_sync = build_recall_sync(cache, cache_ttl_seconds)
     recall_async = build_recall_async(cache, cache_ttl_seconds)
+    retrieve_sync = build_retrieve_sync()
+    retrieve_async = build_retrieve_async()
     chat_sync = build_chat_sync(llm, tools)
     chat_async = build_chat_async(llm, tools)
 
     builder = StateGraph(GraphState)
     builder.add_node("recall", RunnableLambda(recall_sync, afunc=recall_async))
+    builder.add_node("retrieve", RunnableLambda(retrieve_sync, afunc=retrieve_async))
     builder.add_node("chat", RunnableLambda(chat_sync, afunc=chat_async))
     builder.add_node("tools", ToolNode(tools))
     builder.add_edge(START, "recall")
-    builder.add_edge("recall", "chat")
+    builder.add_edge("recall", "retrieve")
+    builder.add_edge("retrieve", "chat")
     builder.add_conditional_edges("chat", should_continue, {"tools": "tools", "__end__": END})
     builder.add_edge("tools", "chat")
     return builder.compile(checkpointer=checkpointer, store=store)

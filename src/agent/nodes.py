@@ -122,13 +122,17 @@ async def _recall_async(
 
 
 def _chat_call_messages(state: GraphState) -> list[BaseMessage]:
-    """History plus recall as ephemeral system context for this call only."""
+    """History plus recall plus passages as ephemeral context for this call only."""
     call_messages: list[BaseMessage] = list(state.get("messages", []))
     docs = state.get("docs") or []
     recall = docs[0] if docs else ""
-    context: list[BaseMessage] = (
-        [SystemMessage(content=f"Context:\n{recall}")] if recall.strip() else []
-    )
+    passages = [chunk.strip() for chunk in (state.get("passages") or []) if chunk.strip()]
+    parts: list[str] = []
+    if passages:
+        parts.append("Policy:\n" + "\n".join(f"- {chunk}" for chunk in passages))
+    if recall.strip():
+        parts.append(f"Context:\n{recall}")
+    context: list[BaseMessage] = [SystemMessage(content="\n".join(parts))] if parts else []
     return context + call_messages
 
 
