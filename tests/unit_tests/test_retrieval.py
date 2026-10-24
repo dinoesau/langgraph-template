@@ -79,6 +79,9 @@ def test_grounded_prompt_delimits_passages_as_data() -> None:
     system_text = str(llm.calls[0][0].content)
     assert "<passages>" in system_text
     assert "Refund" in system_text.split("<passages>")[1]
+
+
+def test_retrieve_overwrites_stale_passages_each_turn() -> None:
     demo = _make_demo(FakeLlm(["ok [1]"]), seed=True)
     result = demo.invoke({**fixed_state("refund policy"), "passages": ["stale"]})
     assert result.get("passages") != ["stale"]
