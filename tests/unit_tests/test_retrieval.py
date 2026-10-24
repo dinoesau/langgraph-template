@@ -5,7 +5,7 @@ store and replies come from a scripted fake llm.
 """
 
 import asyncio
-from typing import Any, cast
+from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -113,7 +113,7 @@ async def _run_async_demo() -> Any:
     builder.add_edge(START, "retrieve")
     builder.add_edge("retrieve", "generate")
     demo = builder.compile(store=make_store(seed=True))
-    return await demo.ainvoke(cast(GraphState, fixed_state("refund policy")))
+    return await demo.ainvoke(fixed_state("refund policy"))
 
 
 def test_async_retrieve_plus_generate() -> None:

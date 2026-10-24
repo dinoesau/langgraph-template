@@ -9,6 +9,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.store.memory import InMemoryStore
 
+from agent.state import GraphState
 from core.memory import passage_namespace
 
 POLICY_PASSAGES = [
@@ -20,7 +21,7 @@ POLICY_PASSAGES = [
 class FakeLlm:
     """Deterministic stand-in for LlmService with the same call surface."""
 
-    def __init__(self, replies: list[str] | None = None, failures: int = 0) -> None:
+    def __init__(self, replies: list[str | AIMessage] | None = None, failures: int = 0) -> None:
         self.replies = list(replies or [])
         self.failures = failures
         self.calls: list[list[BaseMessage]] = []
@@ -29,7 +30,10 @@ class FakeLlm:
         if len(self.calls) <= self.failures:
             raise RuntimeError("fake llm failure")
         if self.replies:
-            return AIMessage(content=self.replies.pop(0))
+            reply = self.replies.pop(0)
+            if isinstance(reply, AIMessage):
+                return reply
+            return AIMessage(content=reply)
         return AIMessage(content="Fake reply")
 
     def call(
@@ -67,6 +71,6 @@ def seed_passages(store: InMemoryStore, texts: list[str]) -> None:
         store.put(passage_namespace(), f"p{index}", {"text": text})
 
 
-def fixed_state(text: str) -> dict[str, list[BaseMessage]]:
+def fixed_state(text: str) -> GraphState:
     """Return a minimal turn state with one human message."""
     return {"messages": [HumanMessage(content=text)]}
