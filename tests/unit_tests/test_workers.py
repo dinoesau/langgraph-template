@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 from agent.state import GraphState
 from agent.workers import (
+    build_category_async,
     build_category_sync,
     build_sentiment_sync,
     build_ticket_graph,
@@ -78,6 +79,18 @@ def test_worker_failure_degrades_its_field_only() -> None:
     assert category(fixed_state("late refund again")) == {"category": "billing"}
 
 
+def test_two_failures_degrade_only_those_fields() -> None:
+    assert build_sentiment_sync(FakeLlm(failures=1))(fixed_state("late again")) == {
+        "sentiment": "unknown"
+    }
+    assert build_urgency_sync(FakeLlm(failures=1))(fixed_state("late again")) == {
+        "urgency": "unknown"
+    }
+    assert build_category_sync(FakeLlm(["billing"]))(fixed_state("late again")) == {
+        "category": "billing"
+    }
+
+
 def test_no_llm_degrades_all_fields_but_card_still_merges() -> None:
     demo = build_ticket_graph(None)
     result = demo.invoke(_ticket("My booking failed", ticket_id="T-2"))
@@ -104,3 +117,10 @@ def test_async_ticket_graph() -> None:
     card = result["messages"][-1].content
     assert "Ticket T-3" in card
     assert "sentiment=positive" in card
+
+
+def test_async_worker_failure_degrades_field() -> None:
+    async def run() -> Any:
+        return await build_category_async(FakeLlm(failures=1))(fixed_state("late again"))
+
+    assert asyncio.run(run()) == {"category": "unknown"}
