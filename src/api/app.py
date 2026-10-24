@@ -25,7 +25,17 @@ def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
     """Build the app with health plus chat and request-id handling."""
     settings = get_settings()
     setup_logging(settings.log_level)
-    app = FastAPI(title="langgraph-template", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="langgraph-template",
+        version="0.1.0",
+        lifespan=lifespan,
+        servers=[
+            {
+                "url": f"http://{settings.app_host}:{settings.app_port}",
+                "description": "local",
+            }
+        ],
+    )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)  # type: ignore[arg-type]
     app.add_middleware(RequestIDMiddleware)

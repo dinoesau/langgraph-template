@@ -74,6 +74,9 @@ Local runs read `.env`, deployed runs use real environment values.
 | `JWT_SESSION_EXPIRE_MINUTES` | `60` | live | Session token lifetime in minutes |
 | `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
 
+OpenAPI `servers` lists only the local URL built from `APP_HOST` plus `APP_PORT` in `src/api/app.py:24`.
+Re-export `openapi.json` after changing host or port so Bruno imports resolve `baseUrl`.
+
 ## Rate limits
 
 Register allows 3 requests per minute per IP, login allows 5 per minute per IP.
