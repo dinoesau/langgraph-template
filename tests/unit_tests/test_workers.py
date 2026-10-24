@@ -56,13 +56,15 @@ def _ticket(text: str, ticket_id: str = "T-1") -> GraphState:
 
 
 def test_one_ticket_merges_into_single_card() -> None:
-    demo = build_ticket_graph(RoutingLlm())
+    llm = RoutingLlm()
+    demo = build_ticket_graph(llm)
     result = demo.invoke(_ticket("My booking failed and I want a refund"))
     card = result["messages"][-1].content
     assert "Ticket T-1" in card
     assert "sentiment=positive" in card
     assert "urgency=high" in card
     assert "category=billing" in card
+    assert "<ticket>" in str(llm.calls[0][0].content)
 
 
 def test_worker_failure_degrades_its_field_only() -> None:

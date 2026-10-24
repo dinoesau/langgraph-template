@@ -43,7 +43,7 @@ def _classify(llm: Any, kind: str, choices: str, text: str) -> str:
         return DEGRADED
     prompt = (
         f"Classify the {kind} of this support ticket as one of {choices}. "
-        f"Reply with only the label.\nTicket: {text}"
+        f"Reply with only the label.\n<ticket>\n{text}\n</ticket>"
     )
     try:
         result = llm.call([HumanMessage(content=prompt)])
@@ -59,7 +59,7 @@ async def _classify_async(llm: Any, kind: str, choices: str, text: str) -> str:
         return DEGRADED
     prompt = (
         f"Classify the {kind} of this support ticket as one of {choices}. "
-        f"Reply with only the label.\nTicket: {text}"
+        f"Reply with only the label.\n<ticket>\n{text}\n</ticket>"
     )
     try:
         result = await llm.acall([HumanMessage(content=prompt)])
