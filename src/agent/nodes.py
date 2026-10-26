@@ -49,6 +49,40 @@ def request_user_id(config: RunnableConfig | None) -> str:
     return valid_user_id(raw) if isinstance(raw, str) else ""
 
 
+def request_session_id(config: RunnableConfig | None) -> str:
+    """Read the session scope for trace joins without failing."""
+    if config is None:
+        return ""
+    configurable = config.get("configurable") or {}
+    raw = configurable.get("session_id", "")
+    return raw if isinstance(raw, str) else ""
+
+
+def request_trace_id(config: RunnableConfig | None) -> str:
+    """Read the request identifier for trace joins without failing."""
+    if config is None:
+        return ""
+    configurable = config.get("configurable") or {}
+    raw = configurable.get("request_id", "")
+    if isinstance(raw, str) and raw.strip():
+        return raw
+    try:
+        from core.middleware import request_id_var
+
+        return request_id_var.get()
+    except Exception:  # noqa: BLE001 - studio path stays without request id
+        return ""
+
+
+def _trace_metadata(config: RunnableConfig | None) -> dict[str, str]:
+    """Build the observability context for one model call."""
+    return {
+        "request_id": request_trace_id(config) or "-",
+        "session_id": request_session_id(config) or "-",
+        "user_id": request_user_id(config) or "-",
+    }
+
+
 def _recall_key(user_id: str, query: str) -> tuple[str, str]:
     """Scoped cache key plus normalized query; one vocabulary for both paths."""
     normalized = normalize_query(query)
@@ -74,8 +108,8 @@ def _recall_sync(
     if cache is not None:
         try:
             cached = cache.get_sync(key)
-        except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
-            logger.warning("recall cache degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_cache_degraded", extra={"error": str(exc)})
             cached = None
         if cached:
             return cached
@@ -85,14 +119,14 @@ def _recall_sync(
                 store.search(memory_namespace(user_id), query=normalized, limit=DEFAULT_TOP_K)
             )
         )
-    except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
-        logger.warning("recall degraded: %s", exc)
+    except Exception as exc:
+        logger.exception("recall_degraded", extra={"error": str(exc)})
         return ""
     if recall and cache is not None:
         try:
             cache.set_sync(key, recall, ttl)
-        except Exception as exc:  # noqa: BLE001 - recall stands without cache
-            logger.warning("recall cache degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_cache_degraded", extra={"error": str(exc)})
     return recall
 
 
@@ -103,22 +137,22 @@ async def _recall_async(
     if cache is not None:
         try:
             cached = await cache.get(key)
-        except Exception as exc:  # noqa: BLE001 - cache miss degrades to store
-            logger.warning("recall cache degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_cache_degraded", extra={"error": str(exc)})
             cached = None
         if cached:
             return cached
     try:
         hits = await store.asearch(memory_namespace(user_id), query=normalized, limit=DEFAULT_TOP_K)
         recall = format_recall(recall_texts(hits))
-    except Exception as exc:  # noqa: BLE001 - store miss degrades to empty
-        logger.warning("recall degraded: %s", exc)
+    except Exception as exc:
+        logger.exception("recall_degraded", extra={"error": str(exc)})
         return ""
     if recall and cache is not None:
         try:
             await cache.set(key, recall, ttl)
-        except Exception as exc:  # noqa: BLE001 - recall stands without cache
-            logger.warning("recall cache degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_cache_degraded", extra={"error": str(exc)})
     return recall
 
 
@@ -165,8 +199,8 @@ def build_recall_sync(cache: RecallCachePort | None, ttl: int) -> Any:
         text, user_id = inputs
         try:
             recall = _recall_sync(get_store(), cache, ttl, user_id, text)
-        except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
-            logger.warning("recall degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_degraded", extra={"error": str(exc)})
             return _clear_docs_if_stale(state)
         if recall.strip():
             return {"docs": [recall]}
@@ -187,8 +221,8 @@ def build_recall_async(cache: RecallCachePort | None, ttl: int) -> Any:
         text, user_id = inputs
         try:
             recall = await _recall_async(get_store(), cache, ttl, user_id, text)
-        except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
-            logger.warning("recall degraded: %s", exc)
+        except Exception as exc:
+            logger.exception("recall_degraded", extra={"error": str(exc)})
             return _clear_docs_if_stale(state)
         if recall.strip():
             return {"docs": [recall]}
@@ -212,9 +246,13 @@ def build_chat_sync(llm: Any, tool_list: Sequence[Any]) -> Any:
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
         try:
-            reply = llm.call(_chat_call_messages(state), list(tool_list) or None)
-        except Exception as exc:  # noqa: BLE001 - model failure degrades to echo
-            logger.warning("chat degraded: %s", exc)
+            reply = llm.call(
+                _chat_call_messages(state),
+                list(tool_list) or None,
+                metadata=_trace_metadata(config),
+            )
+        except Exception as exc:
+            logger.exception("chat_degraded", extra={"error": str(exc)})
             return {
                 "messages": [AIMessage(content=f"Echo: {text}")],
                 **_stale_passages(state),
@@ -237,9 +275,13 @@ def build_chat_async(llm: Any, tool_list: Sequence[Any]) -> Any:
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
         try:
-            result = await llm.acall(_chat_call_messages(state), list(tool_list) or None)
-        except Exception as exc:  # noqa: BLE001 - model failure degrades to echo
-            logger.warning("chat degraded: %s", exc)
+            result = await llm.acall(
+                _chat_call_messages(state),
+                list(tool_list) or None,
+                metadata=_trace_metadata(config),
+            )
+        except Exception as exc:
+            logger.exception("chat_degraded", extra={"error": str(exc)})
             return {
                 "messages": [AIMessage(content=f"Echo: {text}")],
                 **_stale_passages(state),

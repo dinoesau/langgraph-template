@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 from starlette.types import Lifespan
 
+from api.metrics import router as metrics_router
 from api.v1 import auth, chat, health
 from core.config import get_settings
 from core.limiter import RETRY_AFTER_SECONDS, limiter
@@ -33,7 +34,7 @@ def _recursion_handler(request: Request, exc: GraphRecursionError) -> JSONRespon
 def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
     """Build the app with health plus chat and request-id handling."""
     settings = get_settings()
-    setup_logging(settings.log_level)
+    setup_logging(settings.log_level, settings.app_env)
     app = FastAPI(
         title="langgraph-template",
         version="0.1.0",
@@ -49,6 +50,7 @@ def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)  # type: ignore[arg-type]
     app.add_exception_handler(GraphRecursionError, _recursion_handler)  # type: ignore[arg-type]
     app.add_middleware(RequestIDMiddleware)
+    app.include_router(metrics_router)
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")

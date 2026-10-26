@@ -12,6 +12,7 @@ from starlette.background import BackgroundTask
 
 from agent.graph import DEFAULT_RECURSION_LIMIT, AgentGraph
 from api.deps import SessionContext, WriterHook, get_memory_writer, get_request_graph, require_scope
+from core.middleware import request_id_var
 from services.memory import snapshot_messages
 
 router = APIRouter(tags=["chat"])
@@ -38,12 +39,19 @@ class ChatResponse(BaseModel):
     thread_id: str
 
 
-async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str, user_id: str) -> str:
+async def _invoke_loop(
+    agent: AgentGraph, message: str, thread_id: str, user_id: str, request_id: str, session_id: str
+) -> str:
     """Run one loop turn on its thread and return the assistant text."""
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=message)]},
         config={
-            "configurable": {"thread_id": thread_id, "user_id": user_id},
+            "configurable": {
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "request_id": request_id,
+                "session_id": session_id,
+            },
             "recursion_limit": DEFAULT_RECURSION_LIMIT,
         },
     )
@@ -54,14 +62,25 @@ async def _invoke_loop(agent: AgentGraph, message: str, thread_id: str, user_id:
 
 
 async def _stream_loop(
-    agent: AgentGraph, message: str, thread_id: str, user_id: str, box: dict[str, str]
+    agent: AgentGraph,
+    message: str,
+    thread_id: str,
+    user_id: str,
+    box: dict[str, str],
+    request_id: str,
+    session_id: str,
 ) -> AsyncIterator[str]:
     """Yield server-sent event chunks and record the full reply for the writer."""
     texts: list[str] = []
     async for chunk in agent.astream(
         {"messages": [HumanMessage(content=message)]},
         config={
-            "configurable": {"thread_id": thread_id, "user_id": user_id},
+            "configurable": {
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "request_id": request_id,
+                "session_id": session_id,
+            },
             "recursion_limit": DEFAULT_RECURSION_LIMIT,
         },
         stream_mode="updates",
@@ -94,7 +113,10 @@ async def chat(
 ) -> ChatResponse:
     """Delegate one turn to the loop on the session thread."""
     thread_id = _session_thread(ctx)
-    reply = await _invoke_loop(agent, body.message, thread_id, ctx.user_id)
+    request_id = request_id_var.get()
+    reply = await _invoke_loop(
+        agent, body.message, thread_id, ctx.user_id, request_id, ctx.session_id or ""
+    )
     background.add_task(writer, ctx.user_id, snapshot_messages(body.message, reply))
     return ChatResponse(reply=reply, thread_id=thread_id)
 
@@ -110,12 +132,14 @@ def chat_stream(
     thread_id = _session_thread(ctx)
     user_id = ctx.user_id
     box: dict[str, str] = {}
+    request_id = request_id_var.get()
+    session_id = ctx.session_id or ""
 
     async def _write_after() -> None:
         await writer(user_id, snapshot_messages(body.message, box.get("reply")))
 
     return StreamingResponse(
-        _stream_loop(agent, body.message, thread_id, user_id, box),
+        _stream_loop(agent, body.message, thread_id, user_id, box, request_id, session_id),
         media_type="text/event-stream",
         background=BackgroundTask(_write_after),
     )

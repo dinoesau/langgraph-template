@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent.graph import AgentGraph
 from core.config import get_settings
+from core.middleware import session_id_var, user_id_var
 from services.auth_security import InvalidTokenError, decode_token
 from services.auth_store import get_session, get_user_by_id
 from services.database import get_agent_graph, get_agent_store
@@ -107,6 +108,8 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
         if required == "user":
             if await get_user_by_id(db, user_id) is None:
                 _unauthorized(security_scopes.scope_str)
+            user_id_var.set(data.sub)
+            session_id_var.set("-")
             return SessionContext(user_id=data.sub)
         if not data.sid:
             raise HTTPException(
@@ -124,6 +127,8 @@ def require_scope(required: str) -> Callable[..., Awaitable[SessionContext]]:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Session scope mismatch",
             )
+        user_id_var.set(data.sub)
+        session_id_var.set(session.id)
         return SessionContext(user_id=data.sub, session_id=session.id)
 
     return _guard
