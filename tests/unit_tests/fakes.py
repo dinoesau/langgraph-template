@@ -41,6 +41,7 @@ class FakeLlm:
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: Any | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> AIMessage:
         """Sync entry; records messages and returns the next scripted reply."""
         self.calls.append(list(messages))
@@ -51,6 +52,7 @@ class FakeLlm:
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: Any | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> AIMessage:
         """Async entry with the same semantics as the sync entry."""
         self.calls.append(list(messages))

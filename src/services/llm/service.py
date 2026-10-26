@@ -28,6 +28,119 @@ from services.llm.registry import build_registry, rotate
 logger = logging.getLogger("llm")
 
 
+def _trace_callbacks(metadata: dict[str, str] | None) -> list[Any]:
+    """Build Langfuse callbacks when tracing is enabled with keys present."""
+    try:
+        from core.config import get_settings
+    except Exception:  # noqa: BLE001 - tracing never breaks the call
+        return []
+    try:
+        settings = get_settings()
+    except Exception:  # noqa: BLE001 - tracing never breaks the call
+        return []
+    if not settings.langfuse_tracing_enabled:
+        return []
+    if not settings.langfuse_public_key.strip() or not settings.langfuse_secret_key.strip():
+        return []
+    try:
+        from langfuse.langchain import CallbackHandler
+
+        key = settings.langfuse_public_key.strip() or None
+        handler = CallbackHandler(public_key=key)
+        return [handler]
+    except Exception:  # noqa: BLE001 - missing dep or bad keys disables tracing
+        logger.debug("langfuse handler disabled", extra={"reason": "init_failed"})
+        return []
+
+
+def _resolve_metadata(explicit: dict[str, str] | None) -> dict[str, str]:
+    """Merge explicit trace context with the request ContextVar fallback."""
+    data: dict[str, str] = dict(explicit or {})
+    if not data.get("request_id"):
+        try:
+            from core.middleware import request_id_var
+
+            data["request_id"] = request_id_var.get()
+        except Exception:  # noqa: BLE001 - studio path stays without request id
+            data["request_id"] = "-"
+    data.setdefault("session_id", "-")
+    return data
+
+
+def _extract_usage(result: Any) -> dict[str, object]:
+    """Pull token usage from the model reply without failing the turn."""
+    for attr in ("usage_metadata", "usage", "response_metadata"):
+        try:
+            value = getattr(result, attr, None)
+        except Exception as exc:  # noqa: BLE001 - usage is best effort
+            logger.debug("usage read skipped", extra={"attr": attr, "error": str(exc)})
+            continue
+        if isinstance(value, dict) and value:
+            if attr == "response_metadata":
+                nested = value.get("token_usage")
+                if isinstance(nested, dict):
+                    return {"token_usage": nested}
+                continue
+            return {attr: value}
+    return {}
+
+
+def _invoke_sync(model: Any, messages: list[BaseMessage], run_config: dict[str, Any]) -> Any:
+    """Invoke with trace config when supported, else fall back to plain invoke."""
+    try:
+        return model.invoke(messages, config=run_config)
+    except TypeError:
+        return model.invoke(messages)
+
+
+async def _ainvoke_async(
+    model: Any, messages: list[BaseMessage], run_config: dict[str, Any]
+) -> Any:
+    """Async invoke with trace config when supported, else plain ainvoke."""
+    try:
+        return await model.ainvoke(messages, config=run_config)
+    except TypeError:
+        return await model.ainvoke(messages)
+
+
+def _observe_llm(model_name: str, latency: float) -> None:
+    """Record LLM latency without breaking the turn when metrics are down."""
+    try:
+        from core.middleware import llm_inference_duration_seconds
+
+        llm_inference_duration_seconds.labels(model=model_name).observe(max(0.0, latency))
+    except Exception:  # noqa: BLE001 - metrics never break the model call
+        logger.debug("llm metric skipped", extra={"model": model_name})
+
+
+def _log_trace(
+    model_name: str,
+    messages: list[BaseMessage],
+    result: Any,
+    latency: float,
+    trace_meta: dict[str, str],
+) -> None:
+    """Emit one structured trace line with inputs plus outputs plus usage."""
+    try:
+        inputs = [getattr(m, "content", "") for m in messages]
+        output = getattr(result, "content", result)
+        usage = _extract_usage(result)
+        logger.info(
+            "llm_call_completed",
+            extra={
+                "model": model_name,
+                "latency_seconds": latency,
+                "request_id": trace_meta.get("request_id", "-"),
+                "session_id": trace_meta.get("session_id", "-"),
+                "inputs": inputs,
+                "output": output,
+                "usage": usage,
+            },
+        )
+    except Exception:  # noqa: BLE001 - tracing never breaks the call
+        logger.debug("llm trace skipped", extra={"model": model_name})
+
+
 def is_retryable(error: Exception) -> bool:
     """Classify provider failures; auth and validation fail fast.
 
@@ -68,7 +181,7 @@ def is_retryable(error: Exception) -> bool:
         return True
     if isinstance(error, TimeoutError | ConnectionError):
         return True
-    logger.debug("llm unknown error shape, retrying: %s", error)
+    logger.debug("llm_unknown_error_shape", extra={"error": str(error)})
     return True
 
 
@@ -134,17 +247,28 @@ class LlmService:
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: type[BaseModel] | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> Any:
         """Sync entry; retries one model then walks the registry once."""
         deadline = time.monotonic() + self._total_timeout
         last_error: Exception | None = None
+        trace_meta = _resolve_metadata(metadata)
+        callbacks = _trace_callbacks(trace_meta)
         for name, raw_model in self._ordered():
             for attempt in range(self._max_retries):
                 if time.monotonic() >= deadline:
                     break
                 model = self._bind(raw_model, tools, response_format)
+                run_config: dict[str, Any] = {"metadata": {**trace_meta, "model": name}}
+                if callbacks:
+                    run_config["callbacks"] = callbacks
+                started = time.monotonic()
                 try:
-                    return model.invoke(messages)
+                    result = _invoke_sync(model, messages, run_config)
+                    latency = time.monotonic() - started
+                    _observe_llm(name, latency)
+                    _log_trace(name, messages, result, latency, trace_meta)
+                    return result
                 except Exception as exc:
                     last_error = exc
                     if not is_retryable(exc):
@@ -152,11 +276,14 @@ class LlmService:
                     delay = self._compute_delay(attempt, deadline)
                     if delay is None:
                         break
-                    logger.warning("llm retry model=%s attempt=%d", name, attempt + 1)
+                    logger.warning(
+                        "llm_retry",
+                        extra={"model": name, "attempt": attempt + 1, "error": str(exc)},
+                    )
                     time.sleep(delay)
             if time.monotonic() >= deadline:
                 break
-            logger.warning("llm fallback from model=%s", name)
+            logger.warning("llm_fallback", extra={"model": name})
         raise RuntimeError(f"MODEL_UNAVAILABLE: registry exhausted: {last_error}")
 
     async def acall(
@@ -164,17 +291,28 @@ class LlmService:
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: type[BaseModel] | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> Any:
         """Async entry; same semantics as the sync entry for the async path."""
         deadline = time.monotonic() + self._total_timeout
         last_error: Exception | None = None
+        trace_meta = _resolve_metadata(metadata)
+        callbacks = _trace_callbacks(trace_meta)
         for name, raw_model in self._ordered():
             for attempt in range(self._max_retries):
                 if time.monotonic() >= deadline:
                     break
                 model = self._bind(raw_model, tools, response_format)
+                run_config: dict[str, Any] = {"metadata": {**trace_meta, "model": name}}
+                if callbacks:
+                    run_config["callbacks"] = callbacks
+                started = time.monotonic()
                 try:
-                    return await model.ainvoke(messages)
+                    result = await _ainvoke_async(model, messages, run_config)
+                    latency = time.monotonic() - started
+                    _observe_llm(name, latency)
+                    _log_trace(name, messages, result, latency, trace_meta)
+                    return result
                 except Exception as exc:
                     last_error = exc
                     if not is_retryable(exc):
@@ -182,11 +320,14 @@ class LlmService:
                     delay = self._compute_delay(attempt, deadline)
                     if delay is None:
                         break
-                    logger.warning("llm retry model=%s attempt=%d", name, attempt + 1)
+                    logger.warning(
+                        "llm_retry",
+                        extra={"model": name, "attempt": attempt + 1, "error": str(exc)},
+                    )
                     await asyncio.sleep(delay)
             if time.monotonic() >= deadline:
                 break
-            logger.warning("llm fallback from model=%s", name)
+            logger.warning("llm_fallback", extra={"model": name})
         raise RuntimeError(f"MODEL_UNAVAILABLE: registry exhausted: {last_error}")
 
     @staticmethod

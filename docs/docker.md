@@ -6,10 +6,9 @@ This guide covers current use plus the target stack.
 
 ## Status
 
-`docker-compose.yml:1` defines one service today.
-That service is postgres on port 5432.
-It has no pgvector extension yet.
-It has no cache or monitoring services yet.
+`docker-compose.yml:1` defines postgres plus valkey plus prometheus plus grafana today.
+That file has pgvector for checkpoints and vectors.
+It has cache and monitoring services.
 See `docs/structure.md:69` for the compose role.
 See `pyproject.toml:1` for the uv-only packaging setup.
 See `langgraph.json:1` for the graph and env pointer.
@@ -37,10 +36,10 @@ graph TB
 ## Services
 
 Postgres stores app data today.
-It will later store checkpoints and vectors too.
-Valkey is planned as a shared cache for memory search.
-Prometheus is planned to scrape `GET /metrics`.
-Grafana is planned to render latency and error dashboards.
+It later stores checkpoints and vectors too.
+Valkey is live as a shared cache for memory search.
+Prometheus scrapes `GET /metrics`.
+Grafana renders latency and error dashboards.
 A container metrics exporter is planned for system views.
 
 Planned ports:
@@ -107,11 +106,10 @@ Back up production data with managed backups instead.
 
 ## Monitoring
 
-Metrics and dashboards are planned.
-Prometheus config will live in `prometheus/:1`.
-Grafana files will live in `grafana/:1`.
-Both paths do not exist yet.
-The app will expose `GET /metrics` for scraping.
+Metrics and dashboards are live as stubs.
+Prometheus config lives in `prometheus/prometheus.yml:1`.
+Grafana files live in `grafana/dashboards/latency-errors.json:1`.
+The app exposes `GET /metrics` for scraping.
 See `docs/observability.md:1` for metric names.
 Start with postgres only until metrics land.
 
@@ -133,12 +131,11 @@ uv run alembic upgrade head
 
 ## What exists today
 
-`docker-compose.yml:1` starts postgres with fixed credentials.
+`docker-compose.yml:1` starts postgres plus valkey plus prometheus plus grafana with fixed images.
 `Makefile:8` installs with `uv sync`.
 `Makefile:11` runs the dev server.
 No app image exists yet.
-No Valkey service exists yet.
-No monitoring services exist yet.
+Monitoring runs as stubs until per-stage env files land.
 
 ## Next steps
 

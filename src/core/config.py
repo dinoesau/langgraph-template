@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     default_llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_llm_call_retries: int = Field(default=3, ge=1, le=10)
     llm_total_timeout_seconds: int = Field(default=60, ge=5, le=600)
+    # Observability (S6). All tracing stays offline-safe by default.
+    langsmith_tracing: bool = False
+    langfuse_tracing_enabled: bool = False
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = ""
+    debug: bool = False
+    slow_request_threshold_seconds: float = Field(default=1.0, ge=0.0, le=60.0)
     # Auth lifecycle (S4). Empty secret fails closed at token creation.
     jwt_secret_key: str = ""
     jwt_algorithm: Literal["HS256"] = "HS256"

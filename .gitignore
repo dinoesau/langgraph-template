@@ -37,5 +37,8 @@ pgdata/
 *.sqlite3
 *.db
 
+# Observability local (perfiles debug por request id, nunca commiteados)
+profiles/
+
 # LangGraph dev local (genera `langgraph dev`)
 .langgraph_api/
