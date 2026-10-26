@@ -72,7 +72,13 @@ Local runs read `.env`, deployed runs use real environment values.
 | `JWT_ALGORITHM` | `HS256` | live | JWT signing algorithm |
 | `JWT_USER_EXPIRE_MINUTES` | `30` | live | User token lifetime in minutes |
 | `JWT_SESSION_EXPIRE_MINUTES` | `60` | live | Session token lifetime in minutes |
-| `LANGFUSE_TRACING_ENABLED` | planned | planned | Disables tracing during development when false |
+| `LANGSMITH_TRACING` | `false` | live | Enables LangSmith tracing when true |
+| `LANGFUSE_TRACING_ENABLED` | `false` | live | Enables Langfuse long-term traces when true plus keys set |
+| `LANGFUSE_PUBLIC_KEY` | empty | live | Public key for Langfuse, empty keeps tracing offline |
+| `LANGFUSE_SECRET_KEY` | empty | live | Secret key for Langfuse, empty keeps tracing offline |
+| `LANGFUSE_HOST` | empty | live | Custom Langfuse host, empty uses default cloud |
+| `DEBUG` | `false` | live | Enables debug-only slow-request profiles when true |
+| `SLOW_REQUEST_THRESHOLD_SECONDS` | `1.0` | live | Profile threshold in seconds, zero profiles every request |
 
 OpenAPI `servers` lists only the local URL built from `APP_HOST` plus `APP_PORT` in `src/api/app.py:24`.
 Re-export `openapi.json` after changing host or port so Bruno imports resolve `baseUrl`.

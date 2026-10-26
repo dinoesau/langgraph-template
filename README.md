@@ -14,7 +14,7 @@ Most agent features are planned and the repo ships a tool loop with model fallba
 - Layout spec in `docs/structure.md:1` defines where state, nodes, tools, and routes will live.
 - Example specs in `docs/examples.md:1` describe five agents and all five are live in the loop plus two standalone demos.
 - Tool loop with `graph` plus `state` plus `nodes` plus `routes` runs booking tools, echo stays only when no model keys are set.
-- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback plus auth lifecycle is live, observability is planned.
+- HTTP skeleton with health plus chat plus typed settings plus persisted threads plus versioned migrations plus per-user recall with cache front plus background writes plus tool loop with model fallback plus auth lifecycle plus S6 observability is live, evals are still planned.
 - Tests in `tests/unit_tests/` cover the loop plus fallback plus tools plus settings plus HTTP plus memory isolation without model calls.
 - Tests in `tests/integration_tests/` hold placeholders with real models.
 
@@ -51,7 +51,7 @@ Read `docs/structure.md:1` before adding new files so the layout stays small.
 | [Database](docs/database.md) | Planned schema, migrations, and pgvector |
 | [LLM Service](docs/llm-service.md) | Model registry, retries, and circular fallback |
 | [Memory](docs/memory.md) | Planned long-term memory and cache |
-| [Observability](docs/observability.md) | Planned tracing, logging, and metrics |
+| [Observability](docs/observability.md) | Live tracing, logging, and metrics |
 | [Evaluation](docs/evaluation.md) | Planned trajectory scoring and eval runs |
 | [Docker](docs/docker.md) | Planned containers and local services |
 | [Testing](docs/testing.md) | Unit, integration, and E2E layers |  
@@ -80,7 +80,7 @@ Grow into `src/api/` and `src/services/` only when shipping to users.
 
 **Is this ready to deploy today?**
 No.
-The deploy contract maps to the tool loop, auth is live, observability plus evals are still planned.
+The deploy contract maps to the tool loop, auth is live, observability is live, evals are still planned.
 
 **How do I add the first agent?**
 Follow `docs/structure.md:1` for file roles.
