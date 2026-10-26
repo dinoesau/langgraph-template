@@ -8,7 +8,10 @@ import hashlib
 from typing import Any, Protocol
 
 MEMORY_NAMESPACE = "memories"
+PASSAGES_NAMESPACE = "passages"
+PASSAGES_TOPIC = "refund-policy"
 DEFAULT_TOP_K = 4
+PASSAGE_TOP_K = 3
 MAX_USER_ID_CHARS = 128
 
 
@@ -24,6 +27,11 @@ class RecallCachePort(Protocol):
 def memory_namespace(user_id: str) -> tuple[str, str]:
     """Return the per-user namespace so users never read each other rows."""
     return (MEMORY_NAMESPACE, user_id.strip())
+
+
+def passage_namespace() -> tuple[str, str]:
+    """Return the shared policy namespace; passages are global, not per-user."""
+    return (PASSAGES_NAMESPACE, PASSAGES_TOPIC)
 
 
 def valid_user_id(raw: str) -> str:
@@ -67,3 +75,8 @@ def format_recall(texts: list[str]) -> str:
     if not cleaned:
         return ""
     return "\n".join(f"- {text}" for text in cleaned)
+
+
+def sanitize_tag_content(text: str) -> str:
+    """Neutralize closing tags so recalled text stays data, never instructions."""
+    return text.replace("</", "<\\/")
