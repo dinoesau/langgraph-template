@@ -170,6 +170,7 @@ class LabelLlm(FakeLlm):
         messages: list[Any],
         tools: list[Any] | None = None,
         response_format: Any | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> Any:
         """Sync entry; structured label when a format is requested."""
         self.calls.append(messages)

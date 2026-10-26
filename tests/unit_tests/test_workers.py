@@ -28,6 +28,7 @@ class RoutingLlm(FakeLlm):
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: Any | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> AIMessage:
         """Sync entry; routes the reply on the prompt text."""
         self.calls.append(list(messages))
@@ -38,6 +39,7 @@ class RoutingLlm(FakeLlm):
         messages: list[BaseMessage],
         tools: list[Any] | None = None,
         response_format: Any | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> AIMessage:
         """Async entry with the same routing semantics."""
         self.calls.append(list(messages))
