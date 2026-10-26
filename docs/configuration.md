@@ -77,6 +77,8 @@ Local runs read `.env`, deployed runs use real environment values.
 OpenAPI `servers` lists only the local URL built from `APP_HOST` plus `APP_PORT` in `src/api/app.py:24`.
 Re-export `openapi.json` after changing host or port so Bruno imports resolve `baseUrl`.
 
+Turn cap `DEFAULT_RECURSION_LIMIT` of `25` in `src/agent/graph.py:45` applies per HTTP turn in `src/api/v1/chat.py:47,65`; stubborn tool loops surface as `503` via the app handler.
+
 ## Rate limits
 
 Register allows 3 requests per minute per IP, login allows 5 per minute per IP.

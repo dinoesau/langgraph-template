@@ -23,6 +23,7 @@ from core.memory import (
     memory_namespace,
     normalize_query,
     recall_texts,
+    sanitize_tag_content,
     valid_user_id,
 )
 
@@ -61,7 +62,7 @@ def _recall_inputs(state: GraphState, config: RunnableConfig | None) -> tuple[st
     except ValueError:
         return None
     user_id = request_user_id(config)
-    if not user_id or state.get("docs"):
+    if not user_id:
         return None
     return text, user_id
 
@@ -126,13 +127,15 @@ def _chat_call_messages(state: GraphState) -> list[BaseMessage]:
 
     Passages are excluded on purpose: only the retrieval branch runs
     retrieve, so any passages visible here are stale from a prior turn.
+    Recall is sanitized so closing tags stay data, never instructions.
     """
     call_messages: list[BaseMessage] = list(state.get("messages", []))
     docs = state.get("docs") or []
     recall = docs[0] if docs else ""
     context: list[BaseMessage] = []
     if recall.strip():
-        context = [SystemMessage(content=f"<memory>\n{recall.strip()}\n</memory>")]
+        safe = sanitize_tag_content(recall.strip())
+        context = [SystemMessage(content=f"<memory>\n{safe}\n</memory>")]
     return context + call_messages
 
 
@@ -143,6 +146,13 @@ def _wrap_ai(result: Any) -> AIMessage:
     return AIMessage(content=str(result))
 
 
+def _clear_docs_if_stale(state: GraphState) -> dict[str, list[Any]]:
+    """Clear recalled context only when stale exists; absent stays absent."""
+    if state.get("docs"):
+        return {"docs": []}
+    return {"messages": []}
+
+
 def build_recall_sync(cache: RecallCachePort | None, ttl: int) -> Any:
     """Return the sync recall node; runs once per turn before chat."""
 
@@ -151,16 +161,16 @@ def build_recall_sync(cache: RecallCachePort | None, ttl: int) -> Any:
     ) -> dict[str, list[Any]]:
         inputs = _recall_inputs(state, config)
         if inputs is None:
-            return {"messages": []}
+            return _clear_docs_if_stale(state)
         text, user_id = inputs
         try:
             recall = _recall_sync(get_store(), cache, ttl, user_id, text)
         except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
             logger.warning("recall degraded: %s", exc)
-            return {"messages": []}
+            return _clear_docs_if_stale(state)
         if recall.strip():
             return {"docs": [recall]}
-        return {"messages": []}
+        return _clear_docs_if_stale(state)
 
     return recall_sync
 
@@ -173,16 +183,16 @@ def build_recall_async(cache: RecallCachePort | None, ttl: int) -> Any:
     ) -> dict[str, list[Any]]:
         inputs = _recall_inputs(state, config)
         if inputs is None:
-            return {"messages": []}
+            return _clear_docs_if_stale(state)
         text, user_id = inputs
         try:
             recall = await _recall_async(get_store(), cache, ttl, user_id, text)
         except Exception as exc:  # noqa: BLE001 - recall miss keeps reply
             logger.warning("recall degraded: %s", exc)
-            return {"messages": []}
+            return _clear_docs_if_stale(state)
         if recall.strip():
             return {"docs": [recall]}
-        return {"messages": []}
+        return _clear_docs_if_stale(state)
 
     return recall_async
 
@@ -201,8 +211,16 @@ def build_chat_sync(llm: Any, tool_list: Sequence[Any]) -> Any:
         text = last_human_text(state.get("messages", []))
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
+        try:
+            reply = llm.call(_chat_call_messages(state), list(tool_list) or None)
+        except Exception as exc:  # noqa: BLE001 - model failure degrades to echo
+            logger.warning("chat degraded: %s", exc)
+            return {
+                "messages": [AIMessage(content=f"Echo: {text}")],
+                **_stale_passages(state),
+            }
         return {
-            "messages": [_wrap_ai(llm.call(_chat_call_messages(state), list(tool_list) or None))],
+            "messages": [_wrap_ai(reply)],
             **_stale_passages(state),
         }
 
@@ -218,7 +236,14 @@ def build_chat_async(llm: Any, tool_list: Sequence[Any]) -> Any:
         text = last_human_text(state.get("messages", []))
         if llm is None:
             return {"messages": [AIMessage(content=f"Echo: {text}")], **_stale_passages(state)}
-        result = await llm.acall(_chat_call_messages(state), list(tool_list) or None)
+        try:
+            result = await llm.acall(_chat_call_messages(state), list(tool_list) or None)
+        except Exception as exc:  # noqa: BLE001 - model failure degrades to echo
+            logger.warning("chat degraded: %s", exc)
+            return {
+                "messages": [AIMessage(content=f"Echo: {text}")],
+                **_stale_passages(state),
+            }
         return {"messages": [_wrap_ai(result)], **_stale_passages(state)}
 
     return chat_async

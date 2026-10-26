@@ -30,7 +30,7 @@ from agent.retrieval import (
     build_retrieve_async,
     build_retrieve_sync,
 )
-from agent.routes import should_continue, triage_decision_route, triage_route
+from agent.routes import TRIAGE_TARGETS, should_continue, triage_decision_route, triage_route
 from agent.state import GraphState
 from agent.tools import tools
 from agent.triage import build_triage_assist_async, build_triage_assist_sync
@@ -85,17 +85,12 @@ def make_the_agent(
     builder.add_conditional_edges(
         "recall",
         triage_route,
-        {
-            "retrieval": "retrieve",
-            "booking": "chat",
-            "chat": "chat",
-            "triage_assist": "triage_assist",
-        },
+        {**TRIAGE_TARGETS, "triage_assist": "triage_assist"},
     )
     builder.add_conditional_edges(
         "triage_assist",
         triage_decision_route,
-        {"retrieval": "retrieve", "booking": "chat", "chat": "chat"},
+        TRIAGE_TARGETS,
     )
     builder.add_edge("retrieve", "generate")
     builder.add_edge("generate", END)

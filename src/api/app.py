@@ -1,6 +1,7 @@
 """App factory: wires HTTP routes with settings, middleware, and logging."""
 
 from fastapi import FastAPI, Request
+from langgraph.errors import GraphRecursionError
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 from starlette.types import Lifespan
@@ -21,6 +22,14 @@ def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRespons
     )
 
 
+def _recursion_handler(request: Request, exc: GraphRecursionError) -> JSONResponse:
+    """Return 503 when a tool loop hits the turn cap instead of generic 500."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Agent turn limit reached, retry with a narrower request"},
+    )
+
+
 def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
     """Build the app with health plus chat and request-id handling."""
     settings = get_settings()
@@ -38,6 +47,7 @@ def create_app(lifespan: Lifespan[FastAPI] = agent_lifespan) -> FastAPI:
     )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(GraphRecursionError, _recursion_handler)  # type: ignore[arg-type]
     app.add_middleware(RequestIDMiddleware)
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")

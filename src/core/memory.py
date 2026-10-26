@@ -75,3 +75,8 @@ def format_recall(texts: list[str]) -> str:
     if not cleaned:
         return ""
     return "\n".join(f"- {text}" for text in cleaned)
+
+
+def sanitize_tag_content(text: str) -> str:
+    """Neutralize closing tags so recalled text stays data, never instructions."""
+    return text.replace("</", "<\\/")

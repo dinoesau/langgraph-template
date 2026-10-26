@@ -30,6 +30,8 @@ class GradeVerdict(BaseModel):
 
 DRAFT_DEGRADED = "Thanks for reaching out. I will follow up shortly."
 
+MAX_GRADE_REJECTIONS = 2
+
 
 def _text(result: Any) -> str:
     """Extract reply text; non-string blocks stringify at the edge."""
@@ -127,7 +129,7 @@ def build_grader_sync(llm: Any) -> Any:
         if not drafts:
             return {"messages": []}
         attempts = state.get("attempts") or 0
-        if attempts >= 2:
+        if attempts >= MAX_GRADE_REJECTIONS:
             logger.warning("grader guard: accepting last draft after %d rejections", attempts)
             return {"attempts": 0, "grade_feedback": ""}
         if llm is None:
@@ -155,7 +157,7 @@ def build_grader_async(llm: Any) -> Any:
         if not drafts:
             return {"messages": []}
         attempts = state.get("attempts") or 0
-        if attempts >= 2:
+        if attempts >= MAX_GRADE_REJECTIONS:
             logger.warning("grader guard: accepting last draft after %d rejections", attempts)
             return {"attempts": 0, "grade_feedback": ""}
         if llm is None:

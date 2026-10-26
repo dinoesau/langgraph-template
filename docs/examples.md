@@ -2,7 +2,7 @@
 
 This file specs the five example agents to build in this repo.
 Each one demonstrates a core LangGraph workflow pattern.
-Example 1 (ReAct tool agent) is live; examples 2-5 are specs, build in order, router last.
+Example 1 (ReAct tool agent) plus examples 2-5 are live; build in order, router last.
 All examples live under `src/agent/:1`.
 Extra specialists join as subgraph nodes sharing `GraphState` in `src/agent/state.py:1`.
 
@@ -28,8 +28,8 @@ Done when an off-policy question gets "I don't know" instead of a hallucinated a
 Entry `triage_route` in `src/agent/routes.py:1` sends each request to RAG assistant, booking, or chat.
 Rule: refund or status wording goes to retrieval, date or time wording goes to booking, everything else goes to chat.
 Both families matched goes to the `triage_assist` node in `src/agent/triage.py:1`, which stores a validated `TriageLabel` and falls back to chat when unparseable.
-The booking branch reuses the chat plus tools loop as a subgraph sharing state and persistence.
-Done when all three trigger queries route to the right branch.
+The booking branch reuses the chat plus tools loop sharing state and persistence.
+Done when all three trigger queries route to the right branch plus one ambiguous query resolves via `triage_assist`.
 
 ## 4. Parallel workers
 

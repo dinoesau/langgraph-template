@@ -13,9 +13,9 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 
-from agent.nodes import last_human_text
+from agent.nodes import _wrap_ai, last_human_text
 from agent.state import GraphState
-from core.memory import PASSAGE_TOP_K, passage_namespace, recall_texts
+from core.memory import PASSAGE_TOP_K, passage_namespace, recall_texts, sanitize_tag_content
 
 logger = logging.getLogger("agent")
 
@@ -75,21 +75,23 @@ def _grounded_messages(passages: list[str], question: str, recall: str) -> list[
     text can never read as instructions; only the fixed system sentence
     instructs, and the user question travels as a human message.
     """
-    cited = "\n".join(f"[{index + 1}] {chunk}" for index, chunk in enumerate(passages))
+    cited = "\n".join(
+        f"[{index + 1}] {sanitize_tag_content(chunk)}" for index, chunk in enumerate(passages)
+    )
     prompt = (
         "Answer using only the policy passages below. Cite the passage "
         "numbers you rely on.\n<passages>\n" + cited + "\n</passages>"
     )
     if recall.strip():
-        prompt += "\n<extra_context>\n" + recall.strip() + "\n</extra_context>"
+        prompt += (
+            "\n<extra_context>\n" + sanitize_tag_content(recall.strip()) + "\n</extra_context>"
+        )
     return [SystemMessage(content=prompt), HumanMessage(content=question)]
 
 
 def _as_ai(result: Any) -> AIMessage:
-    """Normalize the grounded reply; non-chat results stringify at the edge."""
-    if isinstance(result, AIMessage):
-        return result
-    return AIMessage(content=str(result))
+    """Alias kept for tests; delegates to the shared chat normalizer."""
+    return _wrap_ai(result)
 
 
 def build_retrieve_sync() -> Any:

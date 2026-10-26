@@ -14,6 +14,8 @@ from agent.state import GraphState
 
 TriageTarget = Literal["retrieval", "booking", "chat"]
 
+TRIAGE_TARGETS: dict[str, str] = {"retrieval": "retrieve", "booking": "chat", "chat": "chat"}
+
 RETRIEVAL_WORDS = (
     "refund",
     "refunds",
@@ -51,9 +53,16 @@ BOOKING_WORDS = (
     "reservations",
 )
 
+_RETRIEVAL_RE = re.compile(r"\b(?:" + "|".join(map(re.escape, RETRIEVAL_WORDS)) + r")\b")
+_BOOKING_RE = re.compile(r"\b(?:" + "|".join(map(re.escape, BOOKING_WORDS)) + r")\b")
+
 
 def match_family(text: str, words: tuple[str, ...]) -> bool:
     """Whole-word match over explicit variants; extend tuples, never stems."""
+    if words == RETRIEVAL_WORDS:
+        return bool(_RETRIEVAL_RE.search(text))
+    if words == BOOKING_WORDS:
+        return bool(_BOOKING_RE.search(text))
     return any(re.search(rf"\b{re.escape(word)}\b", text) for word in words)
 
 

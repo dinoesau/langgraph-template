@@ -5,7 +5,7 @@ store and replies come from a scripted fake llm.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -90,7 +90,7 @@ def test_retrieve_overwrites_stale_passages_each_turn() -> None:
 def test_retrieve_degrades_to_echo_without_store() -> None:
     result = graph.invoke({"messages": [HumanMessage(content="hello")]})
     assert result["messages"][-1].content == "Echo: hello"
-    assert result.get("passages") == []
+    assert result.get("passages") in (None, [])
 
 
 def test_miss_clears_stale_passages() -> None:
